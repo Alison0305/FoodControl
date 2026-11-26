@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from .models import Jornada, Pedido, Producto
 from .serializers import JornadaSerializer, PedidoSerializer, PedidoWriteSerializer, ProductoSerializer
-from .services import eliminar_jornada, guardar_pedido
+from .services import eliminar_jornada, filtrar_pedidos, guardar_pedido
 from .validators import validar_jornada_abierta
 
 @api_view(['GET'])
@@ -224,12 +224,18 @@ def activar_producto(request, producto_id):
 def pedidos_jornada(request, jornada_id):
     jornada = get_object_or_404(Jornada, pk=jornada_id)
     if request.method == 'GET':
-        pedidos = Pedido.objects.filter(jornada=jornada).select_related('registrado_por').prefetch_related('detalles__producto').order_by('-fecha_creacion', '-id')
+        params = {key: request.query_params.get(key, '') for key in ('busqueda', 'tipo', 'estado', 'estado_pago', 'orden')}
+        valid = {'tipo': set(Pedido.Tipo.values), 'estado': set(Pedido.Estado.values), 'estado_pago': {'pendiente', 'parcial', 'pagado'}, 'orden': {'recientes', 'antiguos', 'cliente_az', 'cliente_za', 'importe_mayor', 'importe_menor'}}
+        for key, values in valid.items():
+            if params[key] and params[key] not in values:
+                return Response({key: 'Valor de filtro inválido.'}, status=400)
+        pedidos = Pedido.objects.filter(jornada=jornada).select_related('registrado_por').prefetch_related('detalles__producto', 'pagos').order_by('-fecha_creacion', '-id')
+        pedidos = filtrar_pedidos(pedidos, **params)
         return Response(PedidoSerializer(pedidos, many=True).data)
     serializer = PedidoWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     pedido = guardar_pedido(jornada=jornada, usuario=request.user, datos=serializer.validated_data)
-    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto').get(pk=pedido.pk)
+    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto', 'pagos').get(pk=pedido.pk)
     return Response(PedidoSerializer(pedido).data, status=201)
 
 
@@ -237,11 +243,11 @@ def pedidos_jornada(request, jornada_id):
 @permission_classes([IsAuthenticated])
 @csrf_protect
 def pedido_detail(request, pedido_id):
-    pedido = get_object_or_404(Pedido.objects.select_related('jornada', 'registrado_por').prefetch_related('detalles__producto'), pk=pedido_id)
+    pedido = get_object_or_404(Pedido.objects.select_related('jornada', 'registrado_por').prefetch_related('detalles__producto', 'pagos'), pk=pedido_id)
     if request.method == 'GET':
         return Response(PedidoSerializer(pedido).data)
     serializer = PedidoWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     pedido = guardar_pedido(jornada=pedido.jornada, usuario=request.user, datos=serializer.validated_data, pedido=pedido)
-    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto').get(pk=pedido.pk)
+    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto', 'pagos').get(pk=pedido.pk)
     return Response(PedidoSerializer(pedido).data)

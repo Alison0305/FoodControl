@@ -1,4 +1,5 @@
 from decimal import Decimal
+import unicodedata
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -15,6 +16,38 @@ def subtotal_detalle(detalle):
 def importes_pedido(detalles):
     detalles = list(detalles)
     return sum((subtotal_detalle(detalle) for detalle in detalles), Decimal('0.00')), sum(detalle.cantidad for detalle in detalles)
+
+
+def estado_pago_pedido(pedido):
+    total, _ = importes_pedido(pedido.detalles.all())
+    pagado = sum((pago.monto for pago in pedido.pagos.all()), Decimal('0.00'))
+    if total == Decimal('0.00') or pagado >= total:
+        return 'pagado'
+    if pagado > Decimal('0.00'):
+        return 'parcial'
+    return 'pendiente'
+
+
+def normalizar_busqueda(value):
+    return ''.join(character for character in unicodedata.normalize('NFD', value.strip().casefold()) if unicodedata.category(character) != 'Mn')
+
+
+def filtrar_pedidos(pedidos, *, busqueda='', tipo='', estado='', estado_pago='', orden='recientes'):
+    normalized = normalizar_busqueda(busqueda.removeprefix('#'))
+    filtered = []
+    for pedido in pedidos:
+        matches_search = not normalized or (normalized.isdigit() and pedido.id == int(normalized)) or normalized in normalizar_busqueda(pedido.nombre_cliente)
+        if matches_search and (not tipo or pedido.tipo == tipo) and (not estado or pedido.estado == estado) and (not estado_pago or estado_pago_pedido(pedido) == estado_pago):
+            filtered.append(pedido)
+    if orden == 'antiguos':
+        return sorted(filtered, key=lambda pedido: (pedido.fecha_creacion, pedido.id))
+    if orden == 'cliente_az':
+        return sorted(filtered, key=lambda pedido: (normalizar_busqueda(pedido.nombre_cliente), pedido.fecha_creacion, pedido.id))
+    if orden == 'cliente_za':
+        return sorted(filtered, key=lambda pedido: (normalizar_busqueda(pedido.nombre_cliente), pedido.fecha_creacion, pedido.id), reverse=True)
+    if orden in ('importe_mayor', 'importe_menor'):
+        return sorted(filtered, key=lambda pedido: (importes_pedido(pedido.detalles.all())[0], pedido.fecha_creacion, pedido.id), reverse=orden == 'importe_mayor')
+    return sorted(filtered, key=lambda pedido: (pedido.fecha_creacion, pedido.id), reverse=True)
 
 
 @transaction.atomic

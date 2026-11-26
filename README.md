@@ -4,17 +4,30 @@ Sistema web local para organizar ventas familiares de comida. Permitirá registr
 
 ## Tecnologías
 
-- Frontend: React 19, Vite y Tailwind CSS 4 (JavaScript).
+- Frontend: React 19, React Router, Vite, Tailwind CSS 4 y Lucide React (JavaScript).
 - Backend: Django 5.2 y Django REST Framework.
 - Base de datos: SQLite.
 - Autenticación: sesiones de Django, Django REST Framework y CSRF.
+
+## Identidad visual
+
+FoodControl utiliza una identidad visual verde salvia y beige, aplicada mediante tokens de diseño compatibles con Tailwind CSS 4:
+
+- Verde oscuro: `#354F45`.
+- Verde salvia: `#779B89`.
+- Salvia claro: `#CDDCD0`.
+- Beige: `#F5F1E8`.
+- Blanco: `#FFFFFF`.
+- Verde carbón: `#26352E`.
+
+El beige se utiliza como fondo general, el blanco para tarjetas y formularios, y el verde oscuro para la navegación lateral y los botones principales. Los estados funcionales mantienen colores semánticos independientes: amarillo para espera, azul para preparación, verde para entregado y rojo para cancelación o errores.
 
 ## Estructura
 
 ```text
 FoodControl/
 |-- backend/       # API Django y base de datos SQLite local
-|-- frontend/      # Interfaz React/Vite
+|-- frontend/      # Interfaz React/Vite: componentes, layouts, páginas y contexto
 |-- .env.example   # Variables locales de ejemplo
 `-- AGENTS.md      # Guía permanente de desarrollo
 ```
@@ -103,6 +116,25 @@ python manage.py createsuperuser
 
 Inicie backend y frontend, abra `http://localhost:5173` e ingrese las credenciales creadas. Tras iniciar sesión se mostrará una pantalla privada provisional. Use **Cerrar sesión** para invalidar la sesión y volver al formulario de acceso.
 
+## Interfaz principal
+
+La interfaz autenticada cuenta con una barra lateral en computadoras, un menú desplegable en celulares y una barra superior con la sección actual y el usuario autenticado. Usa componentes reutilizables para botones, tarjetas, encabezados, indicadores de estado, campos, estados vacíos, carga y errores.
+
+Rutas privadas disponibles:
+
+| Ruta | Sección |
+| --- | --- |
+| `/` | Inicio y accesos rápidos. |
+| `/jornadas` | Jornadas de venta. |
+| `/menu` | Platos y bebidas. |
+| `/pedidos` | Pedidos y reservas. |
+| `/pagos` | Gestión de pagos. |
+| `/historial` | Historial de ventas. |
+
+Las secciones de negocio muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios y no incluyen operaciones CRUD todavía.
+
+La API exige autenticación por defecto. Solo `/api/health/`, `/api/auth/csrf/` y `/api/auth/login/` permanecen públicos de forma explícita; las solicitudes que cambian estado conservan protección CSRF.
+
 ## Verificaciones
 
 ```powershell
@@ -116,4 +148,4 @@ npm run build
 
 ## Alcance actual
 
-El esquema de datos y la autenticación por sesiones están implementados. Aún no incluye endpoints CRUD, interfaz de gestión, operaciones de cobro, cálculo de totales ni transiciones de estado; esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos, la autenticación por sesiones y la interfaz principal navegable están implementados. Aún no incluye endpoints CRUD ni operaciones de jornadas, menú, pedidos, pagos o historial, dashboard estadístico, cálculo de totales ni transiciones de estado; esos módulos se implementarán en sus issues correspondientes.

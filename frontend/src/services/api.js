@@ -31,25 +31,18 @@ export function getCurrentUser() {
 
 export async function login(username, password) {
   const csrfToken = await getCsrfToken()
-
   return request('/api/auth/login/', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrfToken,
-    },
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     body: JSON.stringify({ username, password }),
   })
 }
 
 export async function logout() {
   const csrfToken = await getCsrfToken()
-
   return request('/api/auth/logout/', {
     method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-    },
+    headers: { 'X-CSRFToken': csrfToken },
   })
 }
 

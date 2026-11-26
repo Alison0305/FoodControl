@@ -16,6 +16,18 @@
 - Mantener dependencias mínimas, código modular y configuraciones explícitas.
 - Toda variable sensible o variable por entorno se documenta en `.env.example`; nunca se versionan archivos `.env`.
 
+## Identidad visual
+
+- La interfaz usa la paleta oficial de FoodControl: verde oscuro `#354F45`, verde salvia `#779B89`, salvia claro `#CDDCD0`, beige `#F5F1E8`, blanco `#FFFFFF` y verde carbón `#26352E`.
+- Los tokens de esta paleta se definen en `frontend/src/index.css` y los componentes deben reutilizar las utilidades de Tailwind generadas a partir de ellos; no introducir colores de marca arbitrarios.
+- Los colores semánticos se mantienen independientes de la marca: amarillo para espera, azul para preparación, verde para entregado y rojo para cancelación o errores.
+
+## Tipografía
+
+- El tamaño base de la interfaz es `16px`; no usar textos menores a `14px`.
+- Los tokens tipográficos se definen en `frontend/src/index.css` y se reutilizan mediante las utilidades de Tailwind: título principal `32px`, subtítulo `20px`, texto general y etiquetas `17px`, descripciones y botones `16px`, e indicadores de estado `14px`.
+- Las dimensiones deben priorizar legibilidad para usuarios adultos, con controles táctiles de al menos `44px` de alto y sin usar `zoom` ni `transform: scale()` para ampliar la interfaz.
+
 ## MVP
 
 El MVP cubrirá jornadas de venta, catálogo de platos y bebidas, reservas, pedidos, cantidades, precios, pagos en efectivo o QR, preparación, entrega e historial de ventas. No incluye pagos integrados, inteligencia artificial, Docker, PostgreSQL, microservicios, despliegue ni infraestructura externa.

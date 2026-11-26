@@ -38,3 +38,7 @@ export function paymentWithIntent(pagos, intent) {
 export function isDefinitivePaymentRejection(error) {
   return Number.isInteger(error?.status) && error.status >= 400 && error.status < 500
 }
+
+export function shouldClearRejectedNewPayment({ retryingPending, registrationCompleted, error }) {
+  return !retryingPending && !registrationCompleted && isDefinitivePaymentRejection(error)
+}

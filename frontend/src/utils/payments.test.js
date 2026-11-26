@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { clearPendingPayment, isDefinitivePaymentRejection, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment } from './payments.js'
+import { clearPendingPayment, isDefinitivePaymentRejection, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment, shouldClearRejectedNewPayment } from './payments.js'
 
 test('valida montos de pago con centavos exactos y saldo disponible', () => {
   assert.equal(paymentError('0.10', '0.30'), '')
@@ -40,4 +40,11 @@ test('distingue rechazos definitivos de resultados inciertos', () => {
   assert.equal(isDefinitivePaymentRejection({ status: 400 }), true)
   assert.equal(isDefinitivePaymentRejection({ status: 500 }), false)
   assert.equal(isDefinitivePaymentRejection(new TypeError('red')), false)
+})
+
+test('solo limpia un rechazo definitivo del registro nuevo', () => {
+  const rejected = { status: 400 }
+  assert.equal(shouldClearRejectedNewPayment({ retryingPending: false, registrationCompleted: false, error: rejected }), true)
+  assert.equal(shouldClearRejectedNewPayment({ retryingPending: true, registrationCompleted: false, error: rejected }), false)
+  assert.equal(shouldClearRejectedNewPayment({ retryingPending: false, registrationCompleted: true, error: rejected }), false)
 })

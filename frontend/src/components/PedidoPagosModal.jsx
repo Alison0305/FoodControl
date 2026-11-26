@@ -6,7 +6,7 @@ import { Button, ErrorMessage, LoadingIndicator, StatusBadge } from './ui.jsx'
 import { useAuth } from '../context/auth.js'
 import { cancelPago, getPagosPedido, registerPago } from '../services/pagos.js'
 import { formatCents } from '../utils/money.js'
-import { clearPendingPayment, isDefinitivePaymentRejection, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment } from '../utils/payments.js'
+import { clearPendingPayment, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment, shouldClearRejectedNewPayment } from '../utils/payments.js'
 
 const paymentTones = { pendiente: 'waiting', parcial: 'preparing', pagado: 'delivered' }
 const paymentLabels = { pendiente: 'Pendiente', parcial: 'Parcial', pagado: 'Pagado' }
@@ -68,9 +68,13 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
   async function submitPayment() {
     if (!pedido || saving || operationRef.current || validation) return
     operationRef.current = true; setSaving(true); setError('')
+    let intent
+    let retryingPending = false
+    let registrationCompleted = false
     try {
       const stored = readPendingPayment(localStorage, user.username, pedido.id)
-      let intent = stored || { identificador_idempotencia: paymentIntentId(intentRef.current), monto: amount, metodo: method }
+      retryingPending = Boolean(stored)
+      intent = stored || { identificador_idempotencia: paymentIntentId(intentRef.current), monto: amount, metodo: method }
       if (stored && (stored.monto !== amount || stored.metodo !== method)) {
         const loaded = await load()
         const recovered = paymentWithIntent(loaded.pagos, stored)
@@ -82,18 +86,19 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
       savePendingPayment(localStorage, user.username, pedido.id, intent)
       intentRef.current = intent.identificador_idempotencia
       await registerPago(pedido.id, intent)
+      registrationCompleted = true
       const loaded = await load()
       const registered = paymentWithIntent(loaded.pagos, intent)
-      if (registered?.estado === 'anulado') { setError('El pago recuperado está anulado y no se registró como un cobro nuevo.'); return }
+      if (registered?.estado === 'anulado') { clearIntent(); setError('El pago recuperado está anulado y no se registró como un cobro nuevo.'); return }
       if (!registered) { setError('No se pudo confirmar el pago en el historial. Puede reintentar con el mismo identificador.'); return }
       clearIntent(); setAmount('')
       onSuccess?.()
     } catch (requestError) {
-      if (isDefinitivePaymentRejection(requestError)) {
+      if (shouldClearRejectedNewPayment({ retryingPending, registrationCompleted, error: requestError })) {
         clearIntent()
         setError(requestError.message || 'El pago fue rechazado. Corrija los datos e intente nuevamente.')
       } else {
-        uncertainRef.current = { identificador_idempotencia: intentRef.current, monto: amount, metodo: method }
+        uncertainRef.current = intent || { identificador_idempotencia: intentRef.current, monto: amount, metodo: method }
         setError(requestError.message || 'No fue posible confirmar el pago. Puede reintentarlo sin duplicarlo.')
       }
     } finally { operationRef.current = false; setSaving(false) }

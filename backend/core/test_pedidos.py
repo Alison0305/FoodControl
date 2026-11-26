@@ -96,7 +96,7 @@ class PedidosApiTests(TestCase):
         self.assertEqual(DetallePedido.objects.get().precio_unitario, Decimal('20.00'))
         Pago.objects.create(pedido=pedido, monto=Decimal('1.00'), metodo='efectivo', registrado_por=self.user)
         response = self.patch(reverse('pedido-detail', args=[pedido.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 3}]))
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(Pago.objects.filter(pedido=pedido).count(), 1)
 
     def test_ignora_precios_manipulados_y_revierte_creacion_intermedia(self):

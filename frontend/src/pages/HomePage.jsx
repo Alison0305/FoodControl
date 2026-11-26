@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CalendarDays, ClipboardList, CreditCard, Soup } from 'lucide-react'
+import { ArrowRight, BookOpen, CalendarDays, ClipboardList, Soup } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import JornadaStatusBadge from '../components/JornadaStatusBadge.jsx'
@@ -10,8 +10,7 @@ import { useJornada } from '../context/jornada.js'
 const quickLinks = [
   { label: 'Jornadas', description: 'Organiza cada día de venta.', path: '/jornadas', icon: CalendarDays },
   { label: 'Menú', description: 'Prepara platos y bebidas.', path: '/menu', icon: Soup },
-  { label: 'Pedidos', description: 'Gestiona reservas y ventas.', path: '/pedidos', icon: ClipboardList },
-  { label: 'Pagos', description: 'Registra efectivo y QR.', path: '/pagos', icon: CreditCard },
+  { label: 'Pedidos y pagos', description: 'Gestiona reservas, ventas y cobros.', path: '/pedidos', icon: ClipboardList },
   { label: 'Historial', description: 'Consulta ventas anteriores.', path: '/historial', icon: BookOpen },
 ]
 
@@ -42,7 +41,7 @@ function HomePage() {
 
       <section>
         <h2 className="text-app-subtitle font-bold text-food-charcoal">Accesos rápidos</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {quickLinks.map(({ icon: Icon, label, description, path }) => (
             <Link className="group rounded-2xl border border-food-sage-light bg-food-white p-6 shadow-sm transition hover:border-food-sage hover:shadow-md focus:outline-none focus:ring-4 focus:ring-food-sage-light" key={path} to={path}>
               <Icon className="text-food-dark" size={24} aria-hidden="true" />

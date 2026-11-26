@@ -1,9 +1,10 @@
 import { X } from 'lucide-react'
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useEffectEvent, useId, useRef } from 'react'
 
 function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClassName = 'text-app-subtitle', children, onClose }) {
   const dialogRef = useRef(null)
   const titleId = useId()
+  const close = useEffectEvent(() => onClose())
 
   useEffect(() => {
     const previousFocus = document.activeElement
@@ -13,7 +14,7 @@ function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClas
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+          close()
         return
       }
       if (event.key !== 'Tab') return
@@ -45,7 +46,7 @@ function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClas
       document.removeEventListener('keydown', handleKeyDown)
       previousFocus?.focus()
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>

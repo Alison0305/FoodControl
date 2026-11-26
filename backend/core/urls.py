@@ -1,6 +1,16 @@
 from django.urls import path
 
-from .views import csrf_token, current_user, health_check, login_view, logout_view
+from .views import (
+    abrir_jornada,
+    cerrar_jornada,
+    csrf_token,
+    current_user,
+    health_check,
+    jornada_detail,
+    jornadas,
+    login_view,
+    logout_view,
+)
 
 urlpatterns = [
     path('health/', health_check, name='health-check'),
@@ -8,4 +18,8 @@ urlpatterns = [
     path('auth/login/', login_view, name='auth-login'),
     path('auth/logout/', logout_view, name='auth-logout'),
     path('auth/me/', current_user, name='auth-me'),
+    path('jornadas/', jornadas, name='jornada-list'),
+    path('jornadas/<int:jornada_id>/', jornada_detail, name='jornada-detail'),
+    path('jornadas/<int:jornada_id>/cerrar/', cerrar_jornada, name='jornada-cerrar'),
+    path('jornadas/<int:jornada_id>/abrir/', abrir_jornada, name='jornada-abrir'),
 ]

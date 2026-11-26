@@ -28,9 +28,9 @@ function MainLayout() {
         </div>
       )}
 
-      <div className="min-w-0 flex-1 lg:ml-[280px]">
+      <div className="min-w-0 flex-1 lg:ml-[310px]">
         <Header title={currentItem?.label || <BrandName />} username={user.username} onOpenMenu={() => setIsMenuOpen(true)} />
-        <main className="mx-auto w-full max-w-[1440px] p-5 sm:p-7 lg:p-10">
+        <main className="mx-auto w-full max-w-[1520px] p-6 sm:p-8 lg:p-11">
           <Outlet />
         </main>
       </div>

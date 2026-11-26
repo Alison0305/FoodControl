@@ -33,8 +33,8 @@ function LoginPage() {
 
   return (
     <main className="min-h-screen bg-food-beige p-5 text-food-charcoal sm:grid sm:place-items-center sm:p-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-lg flex-col justify-center sm:min-h-0">
-        <Card className="p-8 shadow-[0_18px_50px_-25px_rgba(53,79,69,0.28)] sm:p-11">
+      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-xl flex-col justify-center sm:min-h-0">
+        <Card className="p-9 shadow-[0_18px_50px_-25px_rgba(53,79,69,0.28)] sm:p-12">
           <BrandName className="text-app-brand font-bold uppercase tracking-[0.22em] text-food-dark" />
           <h1 className="mt-5 text-app-title font-bold tracking-tight">Bienvenido</h1>
           <p className="mt-4 text-app-description leading-7 text-food-dark">Inicia sesión para continuar con la gestión de tus ventas.</p>

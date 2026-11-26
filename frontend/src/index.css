@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'react-day-picker/style.css';
 
 :root {
   --food-green-dark: #354f45;
@@ -24,15 +25,15 @@
   --color-status-preparing: var(--food-status-preparing);
   --color-status-delivered: var(--food-status-delivered);
   --color-status-cancelled: var(--food-status-cancelled);
-  --text-app-status: 0.875rem;
-  --text-app-description: 1rem;
-  --text-app-base: 1rem;
-  --text-app-body: 1.0625rem;
-  --text-app-label: 1.0625rem;
-  --text-app-nav: 1.125rem;
-  --text-app-subtitle: 1.25rem;
-  --text-app-brand: 1.375rem;
-  --text-app-title: 2rem;
+  --text-app-status: 1rem;
+  --text-app-description: 1.125rem;
+  --text-app-base: 1.125rem;
+  --text-app-body: 1.1875rem;
+  --text-app-label: 1.125rem;
+  --text-app-nav: 1.25rem;
+  --text-app-subtitle: 1.375rem;
+  --text-app-brand: 1.5rem;
+  --text-app-title: 2.125rem;
 }
 
 html {

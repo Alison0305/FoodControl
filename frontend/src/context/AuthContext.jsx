@@ -37,5 +37,9 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
-  return <AuthContext value={{ user, isChecking, login, logout }}>{children}</AuthContext>
+  function clearSession() {
+    setUser(null)
+  }
+
+  return <AuthContext value={{ user, isChecking, login, logout, clearSession }}>{children}</AuthContext>
 }

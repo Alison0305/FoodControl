@@ -118,3 +118,27 @@ class PedidosApiTests(TestCase):
         pedido = Pedido.objects.get(pk=created['id'])
         self.assertEqual(pedido.nombre_cliente, 'Original')
         self.assertEqual(list(pedido.detalles.values_list('producto_id', 'cantidad')), [(self.plato.id, 1)])
+
+    def test_calcula_subtotales_total_y_cantidad_con_precision_decimal(self):
+        self.plato.precio = Decimal('25.00'); self.plato.save()
+        response = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 3}, {'producto_id': self.bebida.id, 'cantidad': 2}]))
+        data = response.json()
+        self.assertEqual(data['total'], '85.00')
+        self.assertEqual(data['cantidad_total'], 5)
+        self.assertEqual([detail['subtotal'] for detail in data['detalles']], ['75.00', '10.00'])
+        self.plato.precio = Decimal('30.00'); self.plato.save()
+        detail = self.client.get(reverse('pedido-detail', args=[data['id']])).json()
+        self.assertEqual(detail['total'], '85.00')
+
+    def test_centavos_cero_nuevos_productos_y_pago_superior_al_total(self):
+        self.plato.precio = Decimal('0.10'); self.plato.save()
+        self.bebida.precio = Decimal('0.00'); self.bebida.save()
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 3}, {'producto_id': self.bebida.id, 'cantidad': 1}])).json()
+        self.assertEqual(created['total'], '0.30')
+        self.assertEqual(created['detalles'][1]['subtotal'], '0.00')
+        pedido = Pedido.objects.get(pk=created['id'])
+        Pago.objects.create(pedido=pedido, monto=Decimal('0.30'), metodo='efectivo', registrado_por=self.user)
+        response = self.patch(reverse('pedido-detail', args=[pedido.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 2}]))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('importe ya pagado', response.json()['detalles'])
+        self.assertEqual(Pago.objects.filter(pedido=pedido).count(), 1)

@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from .models import DetallePedido, Jornada, Pedido, Producto
 from .validators import validar_jornada_abierta
+from .services import importes_pedido, subtotal_detalle
 
 
 class JornadaSerializer(serializers.ModelSerializer):
@@ -80,10 +81,14 @@ class DetallePedidoSerializer(serializers.ModelSerializer):
     producto_id = serializers.IntegerField(source='producto.id', read_only=True)
     producto_nombre = serializers.CharField(source='producto.nombre', read_only=True)
     producto_tipo = serializers.CharField(source='producto.tipo', read_only=True)
+    subtotal = serializers.SerializerMethodField()
+
+    def get_subtotal(self, detail):
+        return format(subtotal_detalle(detail), '.2f')
 
     class Meta:
         model = DetallePedido
-        fields = ('producto_id', 'producto_nombre', 'producto_tipo', 'cantidad', 'precio_unitario')
+        fields = ('producto_id', 'producto_nombre', 'producto_tipo', 'cantidad', 'precio_unitario', 'subtotal')
 
 
 class DetallePedidoInputSerializer(serializers.Serializer):
@@ -95,10 +100,18 @@ class PedidoSerializer(serializers.ModelSerializer):
     jornada = serializers.IntegerField(source='jornada_id', read_only=True)
     registrado_por = serializers.CharField(source='registrado_por.username', read_only=True)
     detalles = DetallePedidoSerializer(many=True, read_only=True)
+    total = serializers.SerializerMethodField()
+    cantidad_total = serializers.SerializerMethodField()
+
+    def get_total(self, pedido):
+        return format(importes_pedido(pedido.detalles.all())[0], '.2f')
+
+    def get_cantidad_total(self, pedido):
+        return importes_pedido(pedido.detalles.all())[1]
 
     class Meta:
         model = Pedido
-        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'observaciones', 'registrado_por', 'fecha_creacion', 'detalles')
+        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'observaciones', 'registrado_por', 'fecha_creacion', 'detalles', 'total', 'cantidad_total')
         read_only_fields = ('id', 'jornada', 'estado', 'registrado_por', 'fecha_creacion', 'detalles')
 
 

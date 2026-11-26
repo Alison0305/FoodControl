@@ -202,6 +202,9 @@ Reglas del módulo:
 - Solo se pueden agregar productos activos de la misma jornada. Las líneas históricas pueden conservar productos que luego se desactiven.
 - No se puede cambiar la jornada, estado, usuario registrador ni fecha de creación directamente.
 - Las escrituras son transaccionales y se bloquean en jornadas cerradas, pedidos entregados o cancelados, o cambios de líneas cuando ya existen pagos.
+- Cada detalle devuelve `subtotal`; cada pedido devuelve `cantidad_total` y `total`. Son campos calculados, no se almacenan ni se aceptan desde el cliente.
+- El subtotal es `cantidad × precio_unitario` histórico, y el total es la suma de subtotales. Por ejemplo, 3 platos de `Bs 25.00` y 2 bebidas de `Bs 5.00` generan subtotales de `Bs 75.00` y `Bs 10.00`, con total `Bs 85.00` y 5 unidades.
+- Los importes de la API se representan como cadenas decimales con dos posiciones, incluso para productos gratuitos.
 
 ## Verificaciones
 
@@ -212,8 +215,9 @@ cd backend
 
 cd ..\frontend
 npm run build
+npm run test:money
 ```
 
 ## Alcance actual
 
-El esquema de datos, la autenticación por sesiones, la interfaz principal, la gestión de jornadas y el catálogo de platos y bebidas están implementados. Aún no incluye pedidos, pagos o historial, dashboard estadístico, cálculo de totales ni transiciones de estado de pedidos; esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos, la autenticación por sesiones, la interfaz principal, jornadas, catálogo, pedidos y sus importes calculados están implementados. Aún no incluye pagos, historial, dashboard estadístico ni transiciones de estado de pedidos; esos módulos se implementarán en sus issues correspondientes.

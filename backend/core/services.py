@@ -1,9 +1,20 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from .models import DetallePedido, Pago, Pedido, Producto
 from .validators import validar_jornada_abierta
+
+
+def subtotal_detalle(detalle):
+    return detalle.cantidad * detalle.precio_unitario
+
+
+def importes_pedido(detalles):
+    detalles = list(detalles)
+    return sum((subtotal_detalle(detalle) for detalle in detalles), Decimal('0.00')), sum(detalle.cantidad for detalle in detalles)
 
 
 @transaction.atomic
@@ -51,6 +62,10 @@ def guardar_pedido(*, jornada, usuario, datos, pedido=None):
         nuevas_lineas = {(detail['producto_id'], detail['cantidad']) for detail in datos['detalles']}
         lineas_actuales = {(detalle.producto_id, detalle.cantidad) for detalle in detalles_existentes.values()}
         if pedido.pagos.exists() and nuevas_lineas != lineas_actuales:
+            importe_pagado = sum((pago.monto for pago in pedido.pagos.all()), Decimal('0.00'))
+            total_propuesto = sum((detail['cantidad'] * (detalles_existentes[detail['producto_id']].precio_unitario if detail['producto_id'] in detalles_existentes else productos[detail['producto_id']].precio) for detail in datos['detalles']), Decimal('0.00'))
+            if total_propuesto < importe_pagado:
+                raise ValidationError({'detalles': 'El total del pedido no puede ser menor al importe ya pagado.'})
             raise ValidationError({'detalles': 'No se pueden modificar productos ni cantidades de un pedido con pagos registrados.'})
         pedido.nombre_cliente = datos['nombre_cliente']
         pedido.tipo = datos['tipo']

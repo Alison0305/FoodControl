@@ -19,6 +19,32 @@ FoodControl/
 `-- AGENTS.md      # Guía permanente de desarrollo
 ```
 
+## Modelo de datos
+
+Los modelos de negocio se encuentran en `backend/core/` y usan el usuario incorporado de Django.
+
+- `Jornada`: nombre, fecha, estado (`abierta` o `cerrada`), usuario creador y fecha de creación.
+- `Producto`: pertenece a una jornada; tiene nombre, tipo (`plato` o `bebida`), precio decimal, estado activo y fecha de creación.
+- `Pedido`: pertenece a una jornada; registra cliente, tipo (`reserva` o `venta_directa`), estado de preparación, observaciones, usuario registrador y fechas de creación y entrega.
+- `DetallePedido`: relaciona un pedido con un producto y conserva cantidad y precio unitario histórico.
+- `Pago`: pertenece a un pedido y registra monto decimal, método (`efectivo` o `qr`), usuario registrador y fecha de pago.
+
+Relaciones principales:
+
+- Una `Jornada` tiene múltiples `Producto` y `Pedido`.
+- Un `Pedido` tiene múltiples `DetallePedido` y `Pago`.
+- Un `Producto` puede aparecer en múltiples `DetallePedido`.
+- Un usuario puede registrar múltiples jornadas, pedidos y pagos.
+
+Restricciones implementadas:
+
+- Las relaciones históricas se protegen contra eliminaciones accidentales mediante `PROTECT`.
+- Los precios no aceptan valores negativos; las cantidades y los pagos deben ser mayores que cero, mediante validadores y restricciones SQL.
+- Un `DetallePedido` valida explícitamente que su producto y pedido pertenezcan a la misma jornada; las futuras operaciones de creación deben invocar `full_clean()` antes de guardar cuando no usen formularios de Django.
+- No se guardan subtotales, totales, saldos ni estados de pago calculables.
+- Un pedido puede tener múltiples pagos y el precio unitario se guarda en cada detalle para preservar el historial.
+
+
 ## Requisitos
 
 - Windows 10/11
@@ -62,4 +88,4 @@ npm run build
 
 ## Alcance actual
 
-Esta inicialización no incluye modelos de negocio, autenticación, pedidos, reservas ni pagos. Esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos para jornadas, productos, pedidos, detalles y pagos está implementado. Aún no incluye autenticación funcional, endpoints CRUD, interfaz de gestión, operaciones de cobro, cálculo de totales ni transiciones de estado; esos módulos se implementarán en sus issues correspondientes.

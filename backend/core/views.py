@@ -1,5 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
@@ -7,9 +9,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Jornada
-from .serializers import JornadaSerializer
+from .models import Jornada, Producto
+from .serializers import JornadaSerializer, ProductoSerializer
 from .services import eliminar_jornada
+from .validators import validar_jornada_abierta
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -116,3 +119,100 @@ def abrir_jornada(request, jornada_id):
     jornada.estado = Jornada.Estado.ABIERTA
     jornada.save(update_fields=['estado'])
     return Response(JornadaSerializer(jornada).data)
+
+
+def validar_jornada_para_modificar(jornada):
+    try:
+        validar_jornada_abierta(jornada)
+    except DjangoValidationError as error:
+        return Response({'detail': error.messages[0]}, status=400)
+    return None
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def productos_jornada(request, jornada_id):
+    jornada = get_object_or_404(Jornada, pk=jornada_id)
+
+    if request.method == 'GET':
+        queryset = Producto.objects.filter(jornada=jornada).order_by('nombre', 'id')
+        tipo = request.query_params.get('tipo')
+        activo = request.query_params.get('activo')
+        if tipo:
+            if tipo not in Producto.Tipo.values:
+                return Response({'tipo': 'El tipo debe ser plato o bebida.'}, status=400)
+            queryset = queryset.filter(tipo=tipo)
+        if activo:
+            if activo not in ('true', 'false'):
+                return Response({'activo': 'El estado debe ser true o false.'}, status=400)
+            queryset = queryset.filter(activo=activo == 'true')
+        return Response(ProductoSerializer(queryset, many=True).data)
+
+    serializer = ProductoSerializer(data=request.data, context={'jornada': jornada})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=201)
+
+
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def producto_detail(request, producto_id):
+    producto = get_object_or_404(Producto.objects.select_related('jornada'), pk=producto_id)
+
+    if request.method == 'GET':
+        return Response(ProductoSerializer(producto).data)
+
+    if request.method == 'DELETE':
+        error = validar_jornada_para_modificar(producto.jornada)
+        if error:
+            return error
+        if producto.detalles.exists():
+            return Response(
+                {'detail': 'No se puede eliminar un producto con pedidos asociados. Puede desactivarlo en su lugar.'},
+                status=409,
+            )
+        try:
+            producto.delete()
+        except (IntegrityError, ProtectedError):
+            return Response(
+                {'detail': 'No se puede eliminar un producto con pedidos asociados. Puede desactivarlo en su lugar.'},
+                status=409,
+            )
+        return Response(status=204)
+
+    serializer = ProductoSerializer(producto, data=request.data, partial=True, context={'jornada': producto.jornada})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def desactivar_producto(request, producto_id):
+    producto = get_object_or_404(Producto.objects.select_related('jornada'), pk=producto_id)
+    error = validar_jornada_para_modificar(producto.jornada)
+    if error:
+        return error
+    if not producto.activo:
+        return Response({'detail': 'El producto ya está inactivo.'}, status=400)
+    producto.activo = False
+    producto.save(update_fields=['activo'])
+    return Response(ProductoSerializer(producto).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def activar_producto(request, producto_id):
+    producto = get_object_or_404(Producto.objects.select_related('jornada'), pk=producto_id)
+    error = validar_jornada_para_modificar(producto.jornada)
+    if error:
+        return error
+    if producto.activo:
+        return Response({'detail': 'El producto ya está activo.'}, status=400)
+    producto.activo = True
+    producto.save(update_fields=['activo'])
+    return Response(ProductoSerializer(producto).data)

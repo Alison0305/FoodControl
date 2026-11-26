@@ -10,6 +10,10 @@ from .views import (
     jornadas,
     login_view,
     logout_view,
+    producto_detail,
+    productos_jornada,
+    activar_producto,
+    desactivar_producto,
 )
 
 urlpatterns = [
@@ -22,4 +26,8 @@ urlpatterns = [
     path('jornadas/<int:jornada_id>/', jornada_detail, name='jornada-detail'),
     path('jornadas/<int:jornada_id>/cerrar/', cerrar_jornada, name='jornada-cerrar'),
     path('jornadas/<int:jornada_id>/abrir/', abrir_jornada, name='jornada-abrir'),
+    path('jornadas/<int:jornada_id>/productos/', productos_jornada, name='producto-list'),
+    path('productos/<int:producto_id>/', producto_detail, name='producto-detail'),
+    path('productos/<int:producto_id>/activar/', activar_producto, name='producto-activar'),
+    path('productos/<int:producto_id>/desactivar/', desactivar_producto, name='producto-desactivar'),
 ]

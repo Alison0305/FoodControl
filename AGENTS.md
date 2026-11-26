@@ -21,6 +21,7 @@
 - La interfaz usa la paleta oficial de FoodControl: verde oscuro `#354F45`, verde salvia `#779B89`, salvia claro `#CDDCD0`, beige `#F5F1E8`, blanco `#FFFFFF` y verde carbón `#26352E`.
 - Los tokens de esta paleta se definen en `frontend/src/index.css` y los componentes deben reutilizar las utilidades de Tailwind generadas a partir de ellos; no introducir colores de marca arbitrarios.
 - Los colores semánticos se mantienen independientes de la marca: amarillo para espera, azul para preparación, verde para entregado y rojo para cancelación o errores.
+- Todos los modales de eliminación deben mostrar su icono rojo de advertencia inmediatamente a la izquierda del título, alineado verticalmente y sin repetirlo debajo del encabezado.
 
 ## Tipografía
 

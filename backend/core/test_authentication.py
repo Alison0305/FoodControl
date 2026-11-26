@@ -55,6 +55,13 @@ class AuthenticationApiTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_public_endpoints_allow_anonymous_access(self):
+        health_response = self.client.get(reverse('health-check'))
+        csrf_response = self.client.get(reverse('auth-csrf'))
+
+        self.assertEqual(health_response.status_code, 200)
+        self.assertEqual(csrf_response.status_code, 200)
+
     def test_me_requires_authentication(self):
         response = self.client.get(reverse('auth-me'))
 

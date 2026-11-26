@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { ApiError, getCurrentUser, login as loginRequest, logout as logoutRequest } from './api.js'
+import { ApiError, getCurrentUser, login as loginRequest, logout as logoutRequest } from '../services/api.js'
 import { AuthContext } from './auth.js'
 
 export function AuthProvider({ children }) {
@@ -13,25 +13,18 @@ export function AuthProvider({ children }) {
     async function restoreSession() {
       try {
         const currentUser = await getCurrentUser()
-        if (isMounted) {
-          setUser(currentUser)
-        }
+        if (isMounted) setUser(currentUser)
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 403) {
           console.error('No se pudo comprobar la sesión.', error)
         }
       } finally {
-        if (isMounted) {
-          setIsChecking(false)
-        }
+        if (isMounted) setIsChecking(false)
       }
     }
 
     restoreSession()
-
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [])
 
   async function login(username, password) {
@@ -44,9 +37,5 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
-  return (
-    <AuthContext value={{ user, isChecking, login, logout }}>
-      {children}
-    </AuthContext>
-  )
+  return <AuthContext value={{ user, isChecking, login, logout }}>{children}</AuthContext>
 }

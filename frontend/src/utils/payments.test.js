@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { clearPendingPayment, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment } from './payments.js'
+import { clearPendingPayment, isDefinitivePaymentRejection, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment } from './payments.js'
 
 test('valida montos de pago con centavos exactos y saldo disponible', () => {
   assert.equal(paymentError('0.10', '0.30'), '')
@@ -34,4 +34,10 @@ test('conserva datos seguros ante fallos de almacenamiento y distingue pagos anu
   assert.equal(readPendingPayment(storage, 'ana', 5), null)
   assert.doesNotThrow(() => clearPendingPayment(storage, 'ana', 5))
   assert.equal(paymentWithIntent([{ identificador_idempotencia: 'uuid-anulado', estado: 'anulado' }], intent).estado, 'anulado')
+})
+
+test('distingue rechazos definitivos de resultados inciertos', () => {
+  assert.equal(isDefinitivePaymentRejection({ status: 400 }), true)
+  assert.equal(isDefinitivePaymentRejection({ status: 500 }), false)
+  assert.equal(isDefinitivePaymentRejection(new TypeError('red')), false)
 })

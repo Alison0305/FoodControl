@@ -6,7 +6,7 @@ import { Button, ErrorMessage, LoadingIndicator, StatusBadge } from './ui.jsx'
 import { useAuth } from '../context/auth.js'
 import { cancelPago, getPagosPedido, registerPago } from '../services/pagos.js'
 import { formatCents } from '../utils/money.js'
-import { clearPendingPayment, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment } from '../utils/payments.js'
+import { clearPendingPayment, isDefinitivePaymentRejection, paymentError, paymentIntentId, paymentWithIntent, readPendingPayment, savePendingPayment } from '../utils/payments.js'
 
 const paymentTones = { pendiente: 'waiting', parcial: 'preparing', pagado: 'delivered' }
 const paymentLabels = { pendiente: 'Pendiente', parcial: 'Parcial', pagado: 'Pagado' }
@@ -51,8 +51,8 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
       const pending = readPendingPayment(localStorage, user.username, pedidoId)
       if (!pending) return
       const payment = paymentWithIntent(loaded.pagos, pending)
-      if (payment?.estado === 'anulado') setError('La intención pendiente corresponde a un pago anulado; no se registrará otro cobro.')
-      else if (payment) clearPendingPayment(localStorage, user.username, pedidoId)
+      if (payment?.estado === 'anulado') { clearIntent(); setError('La intención pendiente corresponde a un pago anulado; no se registrará otro cobro.') }
+      else if (payment) clearIntent()
       else { intentRef.current = pending.identificador_idempotencia; uncertainRef.current = pending; setAmount(pending.monto); setMethod(pending.metodo) }
     } catch { /* Keep the stored intent untouched when history is unavailable. */ }
   }
@@ -62,6 +62,7 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
   const canWrite = jornada.estado === 'abierta' && pedido?.estado !== 'cancelado'
   const validation = pedido ? paymentError(amount, pedido.saldo_pendiente) : ''
   function close() { if (!saving && !anulando) onClose() }
+  function clearIntent() { clearPendingPayment(localStorage, user.username, pedidoId); intentRef.current = ''; uncertainRef.current = null }
 
   function setFullBalance() { if (pedido) setAmount(pedido.saldo_pendiente) }
   async function submitPayment() {
@@ -73,8 +74,8 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
       if (stored && (stored.monto !== amount || stored.metodo !== method)) {
         const loaded = await load()
         const recovered = paymentWithIntent(loaded.pagos, stored)
-        if (recovered?.estado === 'anulado') { clearPendingPayment(localStorage, user.username, pedido.id); setError('La intención pendiente fue anulada. Ya puede registrar un nuevo cobro.'); return }
-        if (recovered) { clearPendingPayment(localStorage, user.username, pedido.id); setError('El pago anterior ya fue registrado.'); return }
+        if (recovered?.estado === 'anulado') { clearIntent(); setError('La intención pendiente fue anulada. Ya puede registrar un nuevo cobro.'); return }
+        if (recovered) { clearIntent(); setError('El pago anterior ya fue registrado.'); return }
         setError('No se pudo confirmar la intención pendiente. Reintente con el mismo monto y método.')
         return
       }
@@ -85,11 +86,16 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
       const registered = paymentWithIntent(loaded.pagos, intent)
       if (registered?.estado === 'anulado') { setError('El pago recuperado está anulado y no se registró como un cobro nuevo.'); return }
       if (!registered) { setError('No se pudo confirmar el pago en el historial. Puede reintentar con el mismo identificador.'); return }
-      clearPendingPayment(localStorage, user.username, pedido.id); setAmount(''); intentRef.current = ''; uncertainRef.current = null
+      clearIntent(); setAmount('')
       onSuccess?.()
     } catch (requestError) {
-      uncertainRef.current = { identificador_idempotencia: intentRef.current, monto: amount, metodo: method }
-      setError(requestError.message || 'No fue posible registrar el pago. Puede reintentarlo sin duplicarlo.')
+      if (isDefinitivePaymentRejection(requestError)) {
+        clearIntent()
+        setError(requestError.message || 'El pago fue rechazado. Corrija los datos e intente nuevamente.')
+      } else {
+        uncertainRef.current = { identificador_idempotencia: intentRef.current, monto: amount, metodo: method }
+        setError(requestError.message || 'No fue posible confirmar el pago. Puede reintentarlo sin duplicarlo.')
+      }
     } finally { operationRef.current = false; setSaving(false) }
   }
   async function annul(pago, motivo) {

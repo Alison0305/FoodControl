@@ -34,3 +34,7 @@ export function clearPendingPayment(storage, username, pedidoId) {
 export function paymentWithIntent(pagos, intent) {
   return pagos.find((pago) => pago.identificador_idempotencia === intent.identificador_idempotencia) || null
 }
+
+export function isDefinitivePaymentRejection(error) {
+  return Number.isInteger(error?.status) && error.status >= 400 && error.status < 500
+}

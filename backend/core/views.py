@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, login, logout
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
@@ -76,7 +77,13 @@ def jornada_detail(request, jornada_id):
         return Response(JornadaSerializer(jornada).data)
 
     if request.method == 'DELETE':
-        eliminar_jornada(jornada)
+        try:
+            eliminar_jornada(jornada)
+        except IntegrityError:
+            return Response(
+                {'detail': 'No se pudo eliminar la jornada porque existen datos relacionados protegidos.'},
+                status=409,
+            )
         return Response(status=204)
 
     serializer = JornadaSerializer(jornada, data=request.data, partial=True, context={'request': request})

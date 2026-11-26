@@ -1,9 +1,9 @@
 import { RotateCcw, TriangleAlert, XCircle } from 'lucide-react'
 
-import { Button } from './ui.jsx'
+import { Button, ErrorMessage } from './ui.jsx'
 import Modal from './Modal.jsx'
 
-function ConfirmDialog({ action, jornada, isLoading, onCancel, onConfirm }) {
+function ConfirmDialog({ action, jornada, isLoading, error, onCancel, onConfirm }) {
   const configuration = {
     cerrar: {
       icon: XCircle,
@@ -45,6 +45,7 @@ function ConfirmDialog({ action, jornada, isLoading, onCancel, onConfirm }) {
         ¿Desea continuar con la jornada <strong className="text-food-charcoal">{jornada.nombre}</strong>?
       </p>
       <p className="mt-3 text-app-body leading-7 text-food-dark">{configuration.description}</p>
+      <div className="mt-5"><ErrorMessage>{error}</ErrorMessage></div>
       <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={cancel} disabled={isLoading}>Cancelar</Button>
         <Button variant={configuration.variant} onClick={onConfirm} disabled={isLoading}>{isLoading ? 'Actualizando...' : configuration.button}</Button>

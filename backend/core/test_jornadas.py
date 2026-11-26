@@ -1,11 +1,14 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from .models import DetallePedido, Jornada, Pago, Pedido, Producto
+from .services import eliminar_jornada
 from .validators import validar_jornada_abierta
 
 
@@ -27,6 +30,9 @@ class JornadasApiTests(TestCase):
 
     def patch(self, url, data):
         return self.client.patch(url, data, content_type='application/json', HTTP_X_CSRFTOKEN=self.csrf_token())
+
+    def delete(self, url):
+        return self.client.delete(url, HTTP_X_CSRFTOKEN=self.csrf_token())
 
     def crear_jornada(self, nombre='Venta familiar', fecha='2026-05-10'):
         return self.post(reverse('jornada-list'), {'nombre': nombre, 'fecha': fecha})
@@ -126,11 +132,32 @@ class JornadasApiTests(TestCase):
             metodo=Pago.Metodo.EFECTIVO,
             registrado_por=self.user,
         )
-
-        delete_response = self.client.delete(
-            reverse('jornada-detail', args=[jornada.id]),
-            HTTP_X_CSRFTOKEN=self.csrf_token(),
+        otro_producto = Producto.objects.create(
+            jornada=otra_jornada,
+            nombre='Producto de otra jornada',
+            tipo=Producto.Tipo.BEBIDA,
+            precio=Decimal('5.00'),
         )
+        otro_pedido = Pedido.objects.create(
+            jornada=otra_jornada,
+            nombre_cliente='Otro cliente',
+            tipo=Pedido.Tipo.RESERVA,
+            registrado_por=self.user,
+        )
+        otro_detalle = DetallePedido.objects.create(
+            pedido=otro_pedido,
+            producto=otro_producto,
+            cantidad=1,
+            precio_unitario=Decimal('5.00'),
+        )
+        otro_pago = Pago.objects.create(
+            pedido=otro_pedido,
+            monto=Decimal('5.00'),
+            metodo=Pago.Metodo.QR,
+            registrado_por=self.user,
+        )
+
+        delete_response = self.delete(reverse('jornada-detail', args=[jornada.id]))
 
         self.assertEqual(delete_response.status_code, 204)
         self.assertFalse(Jornada.objects.filter(pk=jornada.id).exists())
@@ -139,7 +166,87 @@ class JornadasApiTests(TestCase):
         self.assertFalse(DetallePedido.objects.filter(pedido_id=pedido.id).exists())
         self.assertFalse(Pago.objects.filter(pedido_id=pedido.id).exists())
         self.assertTrue(Jornada.objects.filter(pk=otra_jornada.id).exists())
+        self.assertTrue(Producto.objects.filter(pk=otro_producto.id).exists())
+        self.assertTrue(Pedido.objects.filter(pk=otro_pedido.id).exists())
+        self.assertTrue(DetallePedido.objects.filter(pk=otro_detalle.id).exists())
+        self.assertTrue(Pago.objects.filter(pk=otro_pago.id).exists())
         self.assertTrue(get_user_model().objects.filter(pk=self.user.id).exists())
+
+    def test_elimina_jornada_cerrada(self):
+        jornada = Jornada.objects.create(
+            nombre='Venta cerrada',
+            fecha=date(2026, 5, 10),
+            estado=Jornada.Estado.CERRADA,
+            creado_por=self.user,
+        )
+
+        response = self.delete(reverse('jornada-detail', args=[jornada.id]))
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Jornada.objects.filter(pk=jornada.id).exists())
+
+    def test_delete_rechaza_sin_autenticacion_o_csrf(self):
+        jornada = Jornada.objects.create(nombre='Venta', fecha=date(2026, 5, 10), creado_por=self.user)
+        anonymous = Client(enforce_csrf_checks=True)
+
+        unauthenticated_response = anonymous.delete(reverse('jornada-detail', args=[jornada.id]))
+        csrf_response = self.client.delete(reverse('jornada-detail', args=[jornada.id]))
+
+        self.assertEqual(unauthenticated_response.status_code, 403)
+        self.assertEqual(csrf_response.status_code, 403)
+        self.assertTrue(Jornada.objects.filter(pk=jornada.id).exists())
+
+    def test_delete_jornada_inexistente_retorna_404(self):
+        response = self.delete(reverse('jornada-detail', args=[99999]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_reversion_atomica_si_falla_eliminacion(self):
+        jornada = Jornada.objects.create(nombre='Venta', fecha=date(2026, 5, 10), creado_por=self.user)
+        producto = Producto.objects.create(
+            jornada=jornada,
+            nombre='Producto de prueba',
+            tipo=Producto.Tipo.PLATO,
+            precio=Decimal('10.00'),
+        )
+        pedido = Pedido.objects.create(
+            jornada=jornada,
+            nombre_cliente='Cliente de prueba',
+            tipo=Pedido.Tipo.VENTA_DIRECTA,
+            registrado_por=self.user,
+        )
+        detalle = DetallePedido.objects.create(
+            pedido=pedido,
+            producto=producto,
+            cantidad=1,
+            precio_unitario=Decimal('10.00'),
+        )
+        pago = Pago.objects.create(
+            pedido=pedido,
+            monto=Decimal('10.00'),
+            metodo=Pago.Metodo.EFECTIVO,
+            registrado_por=self.user,
+        )
+
+        with patch('core.services.Pedido.objects.filter') as pedido_filter:
+            pedido_filter.return_value.delete.side_effect = IntegrityError('Fallo de prueba')
+            with self.assertRaises(IntegrityError):
+                eliminar_jornada(jornada)
+
+        self.assertTrue(Jornada.objects.filter(pk=jornada.id).exists())
+        self.assertTrue(Producto.objects.filter(pk=producto.id).exists())
+        self.assertTrue(Pedido.objects.filter(pk=pedido.id).exists())
+        self.assertTrue(DetallePedido.objects.filter(pk=detalle.id).exists())
+        self.assertTrue(Pago.objects.filter(pk=pago.id).exists())
+
+    def test_delete_retorna_error_claro_ante_integridad(self):
+        jornada = Jornada.objects.create(nombre='Venta', fecha=date(2026, 5, 10), creado_por=self.user)
+
+        with patch('core.views.eliminar_jornada', side_effect=IntegrityError('Fallo de prueba')):
+            response = self.delete(reverse('jornada-detail', args=[jornada.id]))
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn('No se pudo eliminar la jornada', response.json()['detail'])
 
     def test_rechaza_cambio_directo_de_estado(self):
         jornada = Jornada.objects.create(nombre='Venta', fecha=date(2026, 5, 10), creado_por=self.user)

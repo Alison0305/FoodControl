@@ -27,6 +27,7 @@ function JornadasPage() {
   const [formJornada, setFormJornada] = useState(undefined)
   const [isSaving, setIsSaving] = useState(false)
   const [confirmation, setConfirmation] = useState(null)
+  const [confirmationError, setConfirmationError] = useState('')
   const [isChangingState, setIsChangingState] = useState(false)
   const [detailJornada, setDetailJornada] = useState(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
@@ -79,6 +80,7 @@ function JornadasPage() {
         if (selectedJornada?.id === confirmation.jornada.id) clearSelectedJornada()
         if (detailJornada?.id === confirmation.jornada.id) setDetailJornada(null)
         setConfirmation(null)
+        setConfirmationError('')
         setSuccess('La jornada y sus datos asociados fueron eliminados correctamente.')
         await loadJornadas()
         return
@@ -92,11 +94,16 @@ function JornadasPage() {
         clearSelectedJornada()
       }
       setConfirmation(null)
+      setConfirmationError('')
       setSuccess(updated.estado === 'cerrada' ? 'La jornada fue cerrada correctamente.' : 'La jornada fue reabierta correctamente.')
       await loadJornadas()
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status === 403) clearSession()
-      setError(requestError.message)
+      if (confirmation?.action === 'eliminar') {
+        setConfirmationError(requestError.message)
+      } else {
+        setError(requestError.message)
+      }
     } finally {
       setIsChangingState(false)
     }
@@ -169,8 +176,8 @@ function JornadasPage() {
                   <Button variant="secondary" onClick={() => handleView(jornada)}><Eye size={19} aria-hidden="true" />Consultar</Button>
                   <Button variant="secondary" onClick={() => setFormJornada(jornada)} disabled={!isOpen}><Pencil size={19} aria-hidden="true" />Editar</Button>
                   <Button variant={isSelected ? 'secondary' : 'primary'} onClick={() => selectJornada(jornada)} disabled={!isOpen || isSelected}>{isSelected ? 'Jornada activa' : 'Seleccionar'}</Button>
-                  <Button variant="secondary" onClick={() => setConfirmation({ action: isOpen ? 'cerrar' : 'abrir', jornada })}>{isOpen ? <><XCircle size={19} aria-hidden="true" />Cerrar</> : <><RotateCcw size={19} aria-hidden="true" />Reabrir</>}</Button>
-                  <Button variant="danger" onClick={() => setConfirmation({ action: 'eliminar', jornada })}><Trash2 size={19} aria-hidden="true" />Eliminar</Button>
+                  <Button variant="secondary" onClick={() => { setConfirmationError(''); setConfirmation({ action: isOpen ? 'cerrar' : 'abrir', jornada }) }}>{isOpen ? <><XCircle size={19} aria-hidden="true" />Cerrar</> : <><RotateCcw size={19} aria-hidden="true" />Reabrir</>}</Button>
+                  <Button variant="danger" onClick={() => { setConfirmationError(''); setConfirmation({ action: 'eliminar', jornada }) }}><Trash2 size={19} aria-hidden="true" />Eliminar</Button>
                 </div>
               </Card>
             )
@@ -179,7 +186,7 @@ function JornadasPage() {
       )}
 
       {formJornada !== undefined && <JornadaFormModal key={formJornada?.id || 'new'} jornada={formJornada} isSaving={isSaving} onClose={() => setFormJornada(undefined)} onSave={handleSave} />}
-      {confirmation && <ConfirmDialog action={confirmation.action} jornada={confirmation.jornada} isLoading={isChangingState} onCancel={() => setConfirmation(null)} onConfirm={handleConfirmState} />}
+      {confirmation && <ConfirmDialog action={confirmation.action} jornada={confirmation.jornada} isLoading={isChangingState} error={confirmationError} onCancel={() => { setConfirmationError(''); setConfirmation(null) }} onConfirm={handleConfirmState} />}
       {detailJornada && (
         <Modal title="Detalle de jornada" onClose={() => setDetailJornada(null)}>
           {isLoadingDetail ? <LoadingIndicator label="Consultando jornada..." /> : <div className="space-y-4 text-app-description text-food-dark"><div><p className="font-semibold text-food-charcoal">{detailJornada.nombre}</p><p className="mt-1">{formatDate(detailJornada.fecha)}</p></div><JornadaStatusBadge estado={detailJornada.estado} /><p>Creada por {detailJornada.creado_por}.</p></div>}

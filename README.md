@@ -7,7 +7,7 @@ Sistema web local para organizar ventas familiares de comida. Permitirá registr
 - Frontend: React 19, Vite y Tailwind CSS 4 (JavaScript).
 - Backend: Django 5.2 y Django REST Framework.
 - Base de datos: SQLite.
-- Autenticación futura: sesiones de Django y CSRF.
+- Autenticación: sesiones de Django, Django REST Framework y CSRF.
 
 ## Estructura
 
@@ -53,7 +53,14 @@ Restricciones implementadas:
 
 ## Instalación local en Windows
 
-1. Revise `.env.example` si necesita definir variables del backend en la sesión de PowerShell. La configuración predeterminada sirve para el desarrollo local.
+1. Cree el archivo local de configuración y defina una clave secreta única. El archivo `.env` no se versiona:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edite `DJANGO_SECRET_KEY` en `.env` antes de iniciar Django. También puede definir estas variables en la sesión de PowerShell.
+
 2. En una terminal de PowerShell, prepare el backend:
 
 ```powershell
@@ -73,7 +80,28 @@ npm install
 npm run dev
 ```
 
-Abra la dirección mostrada por Vite, normalmente `http://localhost:5173`. La pantalla inicial consulta `GET /api/health/` mediante el proxy local de Vite y confirma la comunicación con Django.
+Abra la dirección mostrada por Vite, normalmente `http://localhost:5173`. El frontend consume la API mediante el proxy local de Vite, que conserva las cookies de sesión y CSRF durante el desarrollo.
+
+## Autenticación
+
+FoodControl usa sesiones de Django y cookies HTTP, sin JWT ni almacenamiento de contraseñas, tokens o identificadores de sesión en `localStorage`.
+
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/api/auth/csrf/` | Entrega y configura el token CSRF requerido para las solicitudes que cambian estado. |
+| `POST` | `/api/auth/login/` | Inicia sesión con `username` y `password`; requiere el encabezado `X-CSRFToken`. |
+| `POST` | `/api/auth/logout/` | Cierra la sesión actual; requiere autenticación y `X-CSRFToken`. |
+| `GET` | `/api/auth/me/` | Devuelve el usuario autenticado; requiere sesión válida. |
+
+Para crear un usuario autorizado localmente:
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python manage.py createsuperuser
+```
+
+Inicie backend y frontend, abra `http://localhost:5173` e ingrese las credenciales creadas. Tras iniciar sesión se mostrará una pantalla privada provisional. Use **Cerrar sesión** para invalidar la sesión y volver al formulario de acceso.
 
 ## Verificaciones
 
@@ -88,4 +116,4 @@ npm run build
 
 ## Alcance actual
 
-El esquema de datos para jornadas, productos, pedidos, detalles y pagos está implementado. Aún no incluye autenticación funcional, endpoints CRUD, interfaz de gestión, operaciones de cobro, cálculo de totales ni transiciones de estado; esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos y la autenticación por sesiones están implementados. Aún no incluye endpoints CRUD, interfaz de gestión, operaciones de cobro, cálculo de totales ni transiciones de estado; esos módulos se implementarán en sus issues correspondientes.

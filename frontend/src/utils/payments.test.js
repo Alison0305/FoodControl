@@ -27,3 +27,11 @@ test('recupera una intención incierta aislada por usuario y pedido', () => {
   clearPendingPayment(storage, 'ana', 5)
   assert.equal(readPendingPayment(storage, 'ana', 5), null)
 })
+
+test('conserva datos seguros ante fallos de almacenamiento y distingue pagos anulados', () => {
+  const storage = { getItem: () => { throw new Error('sin acceso') }, setItem: () => { throw new Error('sin acceso') }, removeItem: () => { throw new Error('sin acceso') } }
+  const intent = { identificador_idempotencia: 'uuid-anulado', monto: '20.00', metodo: 'efectivo' }
+  assert.equal(readPendingPayment(storage, 'ana', 5), null)
+  assert.doesNotThrow(() => clearPendingPayment(storage, 'ana', 5))
+  assert.equal(paymentWithIntent([{ identificador_idempotencia: 'uuid-anulado', estado: 'anulado' }], intent).estado, 'anulado')
+})

@@ -28,7 +28,7 @@ export function savePendingPayment(storage, username, pedidoId, intent) {
 }
 
 export function clearPendingPayment(storage, username, pedidoId) {
-  storage.removeItem(pendingPaymentKey(username, pedidoId))
+  try { storage.removeItem(pendingPaymentKey(username, pedidoId)) } catch { /* The retry lock is kept in memory until finally runs. */ }
 }
 
 export function paymentWithIntent(pagos, intent) {

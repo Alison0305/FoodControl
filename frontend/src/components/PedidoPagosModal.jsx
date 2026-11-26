@@ -39,12 +39,13 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
   const intentRef = useRef('')
   const uncertainRef = useRef(null)
   const operationRef = useRef(false)
+  const annulRef = useRef(false)
 
   async function load() {
     setLoading(true); setError('')
     try { const loaded = await getPagosPedido(pedidoId); setData(loaded); onUpdated(loaded.pedido); return loaded } catch (requestError) { setError(requestError.message); throw requestError } finally { setLoading(false) }
   }
-  const reload = useEffectEvent(async () => {
+  async function reconcilePending() {
     try {
       const loaded = await load()
       const pending = readPendingPayment(localStorage, user.username, pedidoId)
@@ -54,7 +55,8 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
       else if (payment) clearPendingPayment(localStorage, user.username, pedidoId)
       else { intentRef.current = pending.identificador_idempotencia; uncertainRef.current = pending; setAmount(pending.monto); setMethod(pending.metodo) }
     } catch { /* Keep the stored intent untouched when history is unavailable. */ }
-  })
+  }
+  const reload = useEffectEvent(() => reconcilePending())
   useEffect(() => { const timer = setTimeout(reload, 0); return () => clearTimeout(timer) }, [pedidoId])
   const pedido = data?.pedido
   const canWrite = jornada.estado === 'abierta' && pedido?.estado !== 'cancelado'
@@ -65,21 +67,19 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
   async function submitPayment() {
     if (!pedido || saving || operationRef.current || validation) return
     operationRef.current = true; setSaving(true); setError('')
-    const stored = readPendingPayment(localStorage, user.username, pedido.id)
-    let intent = stored || { identificador_idempotencia: paymentIntentId(intentRef.current), monto: amount, metodo: method }
-    if (stored && (stored.monto !== amount || stored.metodo !== method)) {
-      try {
+    try {
+      const stored = readPendingPayment(localStorage, user.username, pedido.id)
+      let intent = stored || { identificador_idempotencia: paymentIntentId(intentRef.current), monto: amount, metodo: method }
+      if (stored && (stored.monto !== amount || stored.metodo !== method)) {
         const loaded = await load()
         const recovered = paymentWithIntent(loaded.pagos, stored)
-        if (recovered?.estado === 'anulado') { setError('La intención pendiente fue anulada. Revise el historial antes de registrar otro cobro.'); return }
+        if (recovered?.estado === 'anulado') { clearPendingPayment(localStorage, user.username, pedido.id); setError('La intención pendiente fue anulada. Ya puede registrar un nuevo cobro.'); return }
         if (recovered) { clearPendingPayment(localStorage, user.username, pedido.id); setError('El pago anterior ya fue registrado.'); return }
-        clearPendingPayment(localStorage, user.username, pedido.id)
-        intent = { identificador_idempotencia: paymentIntentId(''), monto: amount, metodo: method }
-      } catch { return }
-    }
-    savePendingPayment(localStorage, user.username, pedido.id, intent)
-    intentRef.current = intent.identificador_idempotencia
-    try {
+        setError('No se pudo confirmar la intención pendiente. Reintente con el mismo monto y método.')
+        return
+      }
+      savePendingPayment(localStorage, user.username, pedido.id, intent)
+      intentRef.current = intent.identificador_idempotencia
       await registerPago(pedido.id, intent)
       const loaded = await load()
       const registered = paymentWithIntent(loaded.pagos, intent)
@@ -88,18 +88,18 @@ function PedidoPagosModal({ pedidoId, jornada, onClose, onUpdated, onSuccess }) 
       clearPendingPayment(localStorage, user.username, pedido.id); setAmount(''); intentRef.current = ''; uncertainRef.current = null
       onSuccess?.()
     } catch (requestError) {
-      uncertainRef.current = signature
+      uncertainRef.current = { identificador_idempotencia: intentRef.current, monto: amount, metodo: method }
       setError(requestError.message || 'No fue posible registrar el pago. Puede reintentarlo sin duplicarlo.')
     } finally { operationRef.current = false; setSaving(false) }
   }
   async function annul(pago, motivo) {
-    if (anulando) return
-    setAnulando(pago.id); setError('')
-    try { await cancelPago(pago.id, motivo); await load(); onSuccess?.() } catch (requestError) { setError(requestError.message); throw requestError } finally { setAnulando(null) }
+    if (anulando || annulRef.current) return
+    annulRef.current = true; setAnulando(pago.id); setError('')
+    try { await cancelPago(pago.id, motivo); await load(); onSuccess?.() } catch (requestError) { setError(requestError.message); throw requestError } finally { annulRef.current = false; setAnulando(null) }
   }
 
   if (loading) return <Modal title="Gestión de pagos" onClose={close}><LoadingIndicator label="Cargando pagos..." /></Modal>
-  if (!pedido) return <Modal title="Gestión de pagos" onClose={close}><ErrorMessage>{error || 'No fue posible cargar el pedido.'}</ErrorMessage><div className="mt-5"><Button variant="secondary" onClick={load}>Reintentar</Button></div></Modal>
+  if (!pedido) return <Modal title="Gestión de pagos" onClose={close}><ErrorMessage>{error || 'No fue posible cargar el pedido.'}</ErrorMessage><div className="mt-5"><Button variant="secondary" onClick={reconcilePending}>Reintentar</Button></div></Modal>
   return <><Modal title={`Pagos del pedido #${pedido.id}`} onClose={close}><div className="space-y-6 text-food-dark"><div><p className="text-app-body font-bold text-food-charcoal">{pedido.nombre_cliente}</p><div className="mt-3 flex flex-wrap gap-3"><StatusBadge tone={operationalTones[pedido.estado]}>{operationalLabels[pedido.estado]}</StatusBadge>{pedido.estado !== 'cancelado' && <StatusBadge tone={paymentTones[pedido.estado_pago]}>{paymentLabels[pedido.estado_pago]}</StatusBadge>}</div></div><div className="grid gap-3 rounded-xl bg-food-beige p-4 text-app-description sm:grid-cols-3"><p>Total <strong className="block text-app-label">{formatCents(pedido.total)}</strong></p><p>Pagado <strong className="block text-app-label">{formatCents(pedido.total_pagado)}</strong></p><p>Saldo <strong className="block text-app-label">{pedido.estado === 'cancelado' ? 'Sin saldo por cobrar' : formatCents(pedido.saldo_pendiente)}</strong></p></div><ErrorMessage>{error}</ErrorMessage>{pedido.estado === 'cancelado' ? <p className="rounded-xl bg-red-50 px-4 py-3 text-app-description font-semibold text-status-cancelled">Pedido cancelado: sin saldo por cobrar.</p> : pedido.saldo_pendiente === '0.00' ? <p className="rounded-xl bg-green-100 px-4 py-3 text-app-description font-semibold text-status-delivered">Pedido completamente pagado.</p> : <section className="space-y-4 rounded-xl border border-food-sage-light p-4"><h3 className="text-app-label font-bold text-food-charcoal">Registrar pago</h3><label className="block text-app-label font-semibold text-food-charcoal" htmlFor="monto-pago">Monto (Bs)<input className="mt-2 min-h-[52px] w-full rounded-xl border border-food-sage px-4 text-app-label outline-none focus:ring-4 focus:ring-food-sage-light" id="monto-pago" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} disabled={!canWrite || saving} /></label><Button variant="secondary" onClick={setFullBalance} disabled={!canWrite || saving}>Pagar saldo completo</Button><div className="grid gap-3 sm:grid-cols-2"><Button variant={method === 'efectivo' ? 'primary' : 'secondary'} onClick={() => setMethod('efectivo')} disabled={!canWrite || saving}><Banknote size={20} />Efectivo</Button><Button variant={method === 'qr' ? 'primary' : 'secondary'} onClick={() => setMethod('qr')} disabled={!canWrite || saving}><QrCode size={20} />QR</Button></div>{method === 'qr' && <p className="rounded-xl bg-blue-100 px-4 py-3 text-app-description text-status-preparing">Verifique manualmente la recepción del dinero antes de registrar el pago.</p>}{validation && <ErrorMessage>{validation}</ErrorMessage>}<Button onClick={submitPayment} disabled={!canWrite || saving || Boolean(validation)}>{saving ? 'Registrando...' : 'Registrar pago'}</Button>{!canWrite && <p className="text-app-description">La jornada cerrada no admite nuevos pagos.</p>}</section>}<section><h3 className="text-app-label font-bold text-food-charcoal">Historial de pagos</h3><div className="mt-3 space-y-3">{data.pagos.length === 0 ? <p className="text-app-description">Aún no hay pagos registrados.</p> : data.pagos.map((pago) => <article className={`rounded-xl border p-4 text-app-description ${pago.estado === 'anulado' ? 'border-red-200 bg-red-50' : 'border-food-sage-light'}`} key={pago.id}><div className="flex flex-wrap items-center justify-between gap-3"><strong className="text-app-label text-food-charcoal">{formatCents(pago.monto)} · {pago.metodo === 'qr' ? 'QR' : 'Efectivo'}</strong><StatusBadge tone={pago.estado === 'anulado' ? 'cancelled' : 'delivered'}>{pago.estado === 'anulado' ? 'Anulado' : 'Vigente'}</StatusBadge></div><p className="mt-2">{dateTime(pago.fecha_pago)} · {pago.registrado_por}</p>{pago.estado === 'anulado' ? <p className="mt-2">Anulado por {pago.anulado_por} el {dateTime(pago.fecha_anulacion)}: {pago.motivo_anulacion}</p> : jornada.estado === 'abierta' && <Button className="mt-3" variant="danger" disabled={Boolean(anulando)} onClick={() => setCanceling(pago)}>Anular</Button>}</article>)}</div></section></div></Modal>{canceling && <PagoAnulacionModal pago={canceling} pedido={pedido} onClose={() => setCanceling(null)} onConfirm={(motivo) => annul(canceling, motivo)} />}</>
 }
 

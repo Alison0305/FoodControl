@@ -1,9 +1,13 @@
 import { X } from 'lucide-react'
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useEffectEvent, useId, useRef } from 'react'
+
+const modalStack = []
 
 function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClassName = 'text-app-subtitle', children, onClose }) {
   const dialogRef = useRef(null)
   const titleId = useId()
+  const modalId = useId()
+  const close = useEffectEvent(() => onClose())
 
   useEffect(() => {
     const previousFocus = document.activeElement
@@ -11,9 +15,10 @@ function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClas
     const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
     function handleKeyDown(event) {
+      if (modalStack.at(-1) !== modalId) return
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        close()
         return
       }
       if (event.key !== 'Tab') return
@@ -35,17 +40,19 @@ function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClas
       }
     }
 
+    modalStack.push(modalId)
     document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', handleKeyDown)
     const frame = window.requestAnimationFrame(() => dialogRef.current?.querySelector(focusableSelector)?.focus())
 
     return () => {
       window.cancelAnimationFrame(frame)
-      document.body.style.overflow = previousOverflow
+      modalStack.splice(modalStack.lastIndexOf(modalId), 1)
+      if (modalStack.length === 0) document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', handleKeyDown)
       previousFocus?.focus()
     }
-  }, [onClose])
+  }, [modalId])
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>

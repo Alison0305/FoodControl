@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -123,6 +124,9 @@ class DetallePedido(models.Model):
 
 
 class Pago(models.Model):
+    class Estado(models.TextChoices):
+        VIGENTE = 'vigente', 'Vigente'
+        ANULADO = 'anulado', 'Anulado'
     class Metodo(models.TextChoices):
         EFECTIVO = 'efectivo', 'Efectivo'
         QR = 'qr', 'QR'
@@ -140,6 +144,17 @@ class Pago(models.Model):
         related_name='pagos_registrados',
     )
     fecha_pago = models.DateTimeField(auto_now_add=True)
+    estado = models.CharField(max_length=8, choices=Estado.choices, default=Estado.VIGENTE)
+    motivo_anulacion = models.TextField(blank=True)
+    anulado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='pagos_anulados',
+        null=True,
+        blank=True,
+    )
+    fecha_anulacion = models.DateTimeField(null=True, blank=True)
+    identificador_idempotencia = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     class Meta:
         verbose_name = 'pago'
@@ -150,3 +165,11 @@ class Pago(models.Model):
 
     def __str__(self):
         return f'Bs {self.monto} - {self.get_metodo_display()}'
+
+    def clean(self):
+        super().clean()
+        anulacion = (self.motivo_anulacion, self.anulado_por_id, self.fecha_anulacion)
+        if self.estado == self.Estado.VIGENTE and any(anulacion):
+            raise ValidationError('Un pago vigente no puede contener datos de anulación.')
+        if self.estado == self.Estado.ANULADO and not all(anulacion):
+            raise ValidationError('Un pago anulado requiere motivo, usuario y fecha de anulación.')

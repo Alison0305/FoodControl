@@ -1,4 +1,4 @@
-import { BookOpen, CreditCard } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
 import { LoadingIndicator } from './components/ui.jsx'
@@ -29,7 +29,7 @@ function App() {
           <Route path="/jornadas" element={<JornadasPage />} />
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/pedidos" element={<PedidosPage />} />
-          <Route path="/pagos" element={<ModulePage title="Gestión de pagos" description="Registra los pagos en efectivo y mediante QR." icon={CreditCard} />} />
+          <Route path="/pagos" element={<Navigate to="/pedidos" replace />} />
           <Route path="/historial" element={<ModulePage title="Historial de ventas" description="Consulta las jornadas y ventas anteriores." icon={BookOpen} />} />
         </Route>
       </Route>

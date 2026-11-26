@@ -104,6 +104,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            # SQLite acquires its write lock before monetary reads, preventing stale balances.
+            'transaction_mode': 'IMMEDIATE',
+            'timeout': 20,
+        },
     }
 }
 

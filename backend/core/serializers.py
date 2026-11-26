@@ -1,9 +1,11 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import DetallePedido, Jornada, Pedido, Producto
+from .models import DetallePedido, Jornada, Pago, Pedido, Producto
 from .validators import validar_jornada_abierta
-from .services import estado_pago_pedido, importes_pedido, subtotal_detalle
+from .services import estado_pago_pedido, importes_pedido, resumen_pago_pedido, subtotal_detalle
 
 
 class JornadaSerializer(serializers.ModelSerializer):
@@ -103,6 +105,8 @@ class PedidoSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
     cantidad_total = serializers.SerializerMethodField()
     estado_pago = serializers.SerializerMethodField()
+    total_pagado = serializers.SerializerMethodField()
+    saldo_pendiente = serializers.SerializerMethodField()
 
     def get_total(self, pedido):
         return format(importes_pedido(pedido.detalles.all())[0], '.2f')
@@ -113,9 +117,15 @@ class PedidoSerializer(serializers.ModelSerializer):
     def get_estado_pago(self, pedido):
         return estado_pago_pedido(pedido)
 
+    def get_total_pagado(self, pedido):
+        return format(resumen_pago_pedido(pedido)[1], '.2f')
+
+    def get_saldo_pendiente(self, pedido):
+        return format(resumen_pago_pedido(pedido)[2], '.2f')
+
     class Meta:
         model = Pedido
-        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'estado_pago', 'observaciones', 'registrado_por', 'fecha_creacion', 'fecha_entrega', 'detalles', 'total', 'cantidad_total')
+        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'estado_pago', 'observaciones', 'registrado_por', 'fecha_creacion', 'fecha_entrega', 'detalles', 'total', 'total_pagado', 'saldo_pendiente', 'cantidad_total')
         read_only_fields = ('id', 'jornada', 'estado', 'registrado_por', 'fecha_creacion', 'detalles')
 
 
@@ -141,3 +151,33 @@ class PedidoWriteSerializer(serializers.Serializer):
         if len(product_ids) != len(set(product_ids)):
             raise serializers.ValidationError({'detalles': 'No puede repetir productos en un pedido.'})
         return attrs
+
+
+class PagoSerializer(serializers.ModelSerializer):
+    registrado_por = serializers.CharField(source='registrado_por.username', read_only=True)
+    anulado_por = serializers.CharField(source='anulado_por.username', read_only=True)
+    monto = serializers.SerializerMethodField()
+
+    def get_monto(self, pago):
+        return format(pago.monto, '.2f')
+
+    class Meta:
+        model = Pago
+        fields = ('id', 'pedido', 'monto', 'metodo', 'estado', 'registrado_por', 'fecha_pago', 'motivo_anulacion', 'anulado_por', 'fecha_anulacion', 'identificador_idempotencia')
+        read_only_fields = fields
+
+
+class PagoRegistroSerializer(serializers.Serializer):
+    monto = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    metodo = serializers.ChoiceField(choices=Pago.Metodo.choices)
+    identificador_idempotencia = serializers.UUIDField()
+
+
+class PagoAnulacionSerializer(serializers.Serializer):
+    motivo_anulacion = serializers.CharField()
+
+    def validate_motivo_anulacion(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('El motivo de anulación es obligatorio.')
+        return value

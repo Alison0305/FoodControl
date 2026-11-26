@@ -17,6 +17,8 @@ from .views import (
     pedido_detail,
     pedidos_jornada,
     cambiar_estado_pedido_view,
+    pagos_pedido,
+    anular_pago_view,
 )
 
 urlpatterns = [
@@ -36,4 +38,6 @@ urlpatterns = [
     path('jornadas/<int:jornada_id>/pedidos/', pedidos_jornada, name='pedido-list'),
     path('pedidos/<int:pedido_id>/', pedido_detail, name='pedido-detail'),
     path('pedidos/<int:pedido_id>/estado/', cambiar_estado_pedido_view, name='pedido-estado'),
+    path('pedidos/<int:pedido_id>/pagos/', pagos_pedido, name='pago-list'),
+    path('pagos/<int:pago_id>/anular/', anular_pago_view, name='pago-anular'),
 ]

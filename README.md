@@ -127,11 +127,11 @@ Rutas privadas disponibles:
 | `/` | Inicio y accesos rápidos. |
 | `/jornadas` | Jornadas de venta. |
 | `/menu` | Platos y bebidas. |
-| `/pedidos` | Pedidos y reservas. |
-| `/pagos` | Gestión de pagos. |
+| `/pedidos` | Pedidos, reservas y pagos. |
+| `/pagos` | Redirige a `/pedidos` por compatibilidad. |
 | `/historial` | Historial de ventas. |
 
-Las secciones de pagos e historial muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios.
+Los pagos se gestionan desde cada pedido. El historial permanece como módulo pendiente y no presenta datos ficticios.
 
 La API exige autenticación por defecto. Solo `/api/health/`, `/api/auth/csrf/` y `/api/auth/login/` permanecen públicos de forma explícita; las solicitudes que cambian estado conservan protección CSRF.
 
@@ -183,9 +183,9 @@ Reglas del módulo:
 - Un producto con detalles de pedido conserva su historial y no puede eliminarse; debe desactivarse para dejar de ofrecerse en pedidos nuevos.
 - Cambiar el precio de un producto no altera los precios unitarios ya guardados en los detalles de pedidos.
 
-## Pedidos y reservas
+## Pedidos, reservas y pagos
 
-El módulo **Pedidos y reservas** registra reservas y ventas directas dentro de la jornada seleccionada, con varios productos y cantidades por pedido.
+El módulo **Pedidos, reservas y pagos** registra reservas y ventas directas dentro de la jornada seleccionada, con varios productos, cantidades y cobros asociados.
 
 | Método | Endpoint | Descripción |
 | --- | --- | --- |
@@ -201,14 +201,26 @@ Reglas del módulo:
 - El backend asigna el precio vigente para productos nuevos y conserva el precio histórico de líneas existentes.
 - Solo se pueden agregar productos activos de la misma jornada. Las líneas históricas pueden conservar productos que luego se desactiven.
 - No se puede cambiar la jornada, estado, usuario registrador ni fecha de creación directamente.
-- Las escrituras son transaccionales y se bloquean en jornadas cerradas, pedidos entregados o cancelados, o cambios de líneas cuando ya existen pagos.
+- Las escrituras son transaccionales y se bloquean en jornadas cerradas y pedidos entregados o cancelados. Las líneas pueden editarse si el nuevo total no es menor a los pagos vigentes.
 - Cada detalle devuelve `subtotal`; cada pedido devuelve `cantidad_total` y `total`. Son campos calculados, no se almacenan ni se aceptan desde el cliente.
 - El subtotal es `cantidad × precio_unitario` histórico, y el total es la suma de subtotales. Por ejemplo, 3 platos de `Bs 25.00` y 2 bebidas de `Bs 5.00` generan subtotales de `Bs 75.00` y `Bs 10.00`, con total `Bs 85.00` y 5 unidades.
 - Los importes de la API se representan como cadenas decimales con dos posiciones, incluso para productos gratuitos.
 - El listado de pedidos admite `busqueda`, `tipo`, `estado`, `estado_pago` y `orden`. La búsqueda ignora tildes y mayúsculas; acepta nombres o el identificador exacto, por ejemplo `Castro`, `Jose` o `#3`.
-- Los estados de pago son `pendiente`, `parcial` y `pagado`, calculados con el total histórico y los pagos asociados. Los pedidos gratuitos se consideran pagados.
+- Los estados de pago son `pendiente`, `parcial` y `pagado`, calculados con el total histórico y los pagos vigentes. Los pedidos gratuitos se consideran pagados.
+
+### Pagos
+
+| Método | Ruta | Descripción |
+| --- | --- | --- |
+| `GET` | `/api/pedidos/{id}/pagos/` | Devuelve el historial de pagos y el resumen monetario del pedido. |
+| `POST` | `/api/pedidos/{id}/pagos/` | Registra un pago con `monto`, `metodo` e `identificador_idempotencia` UUID. |
+| `POST` | `/api/pagos/{id}/anular/` | Anula un pago conservando su historial; requiere `motivo_anulacion`. |
+
+Los montos usan cadenas decimales con dos posiciones. Un pago no puede superar el saldo, ni registrarse o anularse en una jornada cerrada. Los pagos anulados no cuentan en `total_pagado`, `saldo_pendiente` ni `estado_pago`, pero permanecen en el historial. Repetir un UUID con el mismo pedido, monto y método devuelve el pago original sin duplicarlo, incluso si fue anulado; con datos diferentes o en otro pedido se rechaza.
+- La migración `core.0002_pago_anulaciones_idempotencia` conserva pagos existentes, los marca como vigentes y les asigna UUID distintos antes de aplicar la restricción única.
+- SQLite inicia transacciones monetarias en modo `IMMEDIATE` con espera de 20 segundos. Registro, anulación, edición y cambio de estado recargan sus datos dentro de la transacción para serializar saldo, pagos y estado operativo.
 - Las opciones de orden son `recientes`, `antiguos`, `cliente_az`, `cliente_za`, `importe_mayor` e `importe_menor`.
-- `POST /api/pedidos/{id}/estado/` cambia el estado mediante las transiciones `en_espera` a `en_preparacion` o `cancelado`, y `en_preparacion` a `entregado` o `cancelado`. La entrega registra su fecha; la cancelación se bloquea cuando hay pagos.
+- `POST /api/pedidos/{id}/estado/` cambia el estado mediante las transiciones `en_espera` a `en_preparacion` o `cancelado`, y `en_preparacion` a `entregado` o `cancelado`. La entrega registra su fecha; la cancelación se bloquea cuando hay pagos vigentes.
 
 ## Verificaciones
 
@@ -222,6 +234,10 @@ npm run build
 npm run test:money
 ```
 
+## Próxima issue: Inicio
+
+La issue #12 incorporará en Inicio el resumen financiero de la jornada actual, un indicador visible de la jornada seleccionada, una advertencia y acción para seleccionar o cambiar jornada, y una guía rápida plegable. La guía explicará: crear o seleccionar una jornada; configurar platos, bebidas y precios; registrar pedidos, reservas y pagos; revisar cobros y finalizar la jornada; y consultar el historial de ventas.
+
 ## Alcance actual
 
-El esquema de datos, la autenticación por sesiones, la interfaz principal, jornadas, catálogo, pedidos y sus importes calculados están implementados. Aún no incluye pagos, historial, dashboard estadístico ni transiciones de estado de pedidos; esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos, la autenticación por sesiones, jornadas, catálogo, pedidos, pagos, sus importes calculados y transiciones operativas están implementados. El historial y el dashboard de inicio se completarán en sus issues correspondientes.

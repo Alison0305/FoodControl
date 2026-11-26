@@ -9,9 +9,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Jornada, Pedido, Producto
-from .serializers import JornadaSerializer, PedidoSerializer, PedidoWriteSerializer, ProductoSerializer
-from .services import cambiar_estado_pedido, eliminar_jornada, filtrar_pedidos, guardar_pedido
+from .models import Jornada, Pago, Pedido, Producto
+from .serializers import JornadaSerializer, PagoAnulacionSerializer, PagoRegistroSerializer, PagoSerializer, PedidoSerializer, PedidoWriteSerializer, ProductoSerializer
+from .services import anular_pago, cambiar_estado_pedido, eliminar_jornada, filtrar_pedidos, guardar_pedido, registrar_pago
 from .validators import validar_jornada_abierta
 
 @api_view(['GET'])
@@ -264,3 +264,27 @@ def cambiar_estado_pedido_view(request, pedido_id):
     pedido = cambiar_estado_pedido(pedido, estado)
     pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto', 'pagos').get(pk=pedido.pk)
     return Response(PedidoSerializer(pedido).data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def pagos_pedido(request, pedido_id):
+    pedido = get_object_or_404(Pedido.objects.select_related('jornada').prefetch_related('detalles__producto', 'pagos__registrado_por', 'pagos__anulado_por'), pk=pedido_id)
+    if request.method == 'GET':
+        return Response({'pedido': PedidoSerializer(pedido).data, 'pagos': PagoSerializer(pedido.pagos.all().order_by('fecha_pago', 'id'), many=True).data})
+    serializer = PagoRegistroSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    pago = registrar_pago(pedido=pedido, usuario=request.user, monto=serializer.validated_data['monto'], metodo=serializer.validated_data['metodo'], identificador=serializer.validated_data['identificador_idempotencia'])
+    return Response(PagoSerializer(pago).data, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def anular_pago_view(request, pago_id):
+    pago = get_object_or_404(Pago.objects.select_related('pedido__jornada'), pk=pago_id)
+    serializer = PagoAnulacionSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    pago = anular_pago(pago=pago, usuario=request.user, motivo=serializer.validated_data['motivo_anulacion'])
+    return Response(PagoSerializer(pago).data)

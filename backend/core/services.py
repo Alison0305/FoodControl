@@ -1,13 +1,27 @@
 from decimal import Decimal
+from functools import wraps
 import unicodedata
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import OperationalError, transaction
+from django.db import IntegrityError, OperationalError, transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from .models import DetallePedido, Jornada, Pago, Pedido, Producto
 from .validators import validar_jornada_abierta
+
+
+def transaccion_monetaria(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        try:
+            with transaction.atomic():
+                return func(*args, **kwargs)
+        except OperationalError as error:
+            if 'locked' not in str(error).lower() and 'busy' not in str(error).lower():
+                raise
+            raise ValidationError({'detail': 'La operación está siendo procesada. Intente nuevamente.'}) from error
+    return wrapped
 
 
 def subtotal_detalle(detalle):
@@ -20,13 +34,62 @@ def importes_pedido(detalles):
 
 
 def estado_pago_pedido(pedido):
-    total, _ = importes_pedido(pedido.detalles.all())
-    pagado = sum((pago.monto for pago in pedido.pagos.all()), Decimal('0.00'))
+    total, pagado, _ = resumen_pago_pedido(pedido)
     if total == Decimal('0.00') or pagado >= total:
         return 'pagado'
     if pagado > Decimal('0.00'):
         return 'parcial'
     return 'pendiente'
+
+
+def resumen_pago_pedido(pedido):
+    total, _ = importes_pedido(pedido.detalles.all())
+    pagado = sum((pago.monto for pago in pedido.pagos.all() if pago.estado == Pago.Estado.VIGENTE), Decimal('0.00'))
+    return total, pagado, total - pagado
+
+
+@transaccion_monetaria
+def registrar_pago(*, pedido, usuario, monto, metodo, identificador):
+    pedido = Pedido.objects.select_related('jornada').prefetch_related('detalles', 'pagos').get(pk=pedido.pk)
+    existente = Pago.objects.filter(identificador_idempotencia=identificador).select_related('pedido').first()
+    if existente:
+        if existente.pedido_id == pedido.id and existente.monto == monto and existente.metodo == metodo:
+            return existente
+        raise ValidationError({'identificador_idempotencia': 'El identificador ya fue usado con datos diferentes.'})
+    try:
+        validar_jornada_abierta(pedido.jornada)
+    except DjangoValidationError as error:
+        raise ValidationError({'detail': error.messages[0]}) from error
+    if pedido.estado == Pedido.Estado.CANCELADO:
+        raise ValidationError({'detail': 'No se pueden registrar pagos en un pedido cancelado.'})
+    _, _, saldo = resumen_pago_pedido(pedido)
+    if monto > saldo:
+        raise ValidationError({'monto': 'El monto no puede superar el saldo pendiente.'})
+    try:
+        # The savepoint keeps the outer IMMEDIATE transaction usable after a UUID race.
+        with transaction.atomic():
+            return Pago.objects.create(pedido=pedido, monto=monto, metodo=metodo, registrado_por=usuario, identificador_idempotencia=identificador)
+    except IntegrityError:
+        existente = Pago.objects.filter(identificador_idempotencia=identificador).first()
+        if existente and existente.pedido_id == pedido.id and existente.monto == monto and existente.metodo == metodo:
+            return existente
+        raise
+
+
+@transaccion_monetaria
+def anular_pago(*, pago, usuario, motivo):
+    pago = Pago.objects.select_related('pedido__jornada').get(pk=pago.pk)
+    try:
+        validar_jornada_abierta(pago.pedido.jornada)
+    except DjangoValidationError as error:
+        raise ValidationError({'detail': error.messages[0]}) from error
+    if pago.estado == Pago.Estado.ANULADO:
+        raise ValidationError({'detail': 'El pago ya fue anulado.'})
+    updated = Pago.objects.filter(pk=pago.pk, estado=Pago.Estado.VIGENTE).update(estado=Pago.Estado.ANULADO, motivo_anulacion=motivo, anulado_por=usuario, fecha_anulacion=timezone.now())
+    if not updated:
+        raise ValidationError({'detail': 'El pago fue actualizado por otra operación.'})
+    pago.refresh_from_db()
+    return pago
 
 
 def normalizar_busqueda(value):
@@ -54,8 +117,9 @@ def filtrar_pedidos(pedidos, *, busqueda='', tipo='', estado='', estado_pago='',
     return sorted(filtered, key=lambda pedido: (pedido.fecha_creacion, pedido.id), reverse=True)
 
 
-@transaction.atomic
+@transaccion_monetaria
 def cambiar_estado_pedido(pedido, nuevo_estado):
+    pedido = Pedido.objects.select_related('jornada').prefetch_related('pagos').get(pk=pedido.pk)
     try:
         validar_jornada_abierta(pedido.jornada)
     except DjangoValidationError as error:
@@ -66,7 +130,7 @@ def cambiar_estado_pedido(pedido, nuevo_estado):
     }
     if nuevo_estado not in transitions.get(pedido.estado, set()):
         raise ValidationError({'estado': 'La transición de estado solicitada no está permitida.'})
-    if nuevo_estado == Pedido.Estado.CANCELADO and pedido.pagos.exists():
+    if nuevo_estado == Pedido.Estado.CANCELADO and pedido.pagos.filter(estado=Pago.Estado.VIGENTE).exists():
         raise ValidationError({'detail': 'No se puede cancelar un pedido con pagos registrados sin resolver.'})
     updates = {'estado': nuevo_estado}
     if nuevo_estado == Pedido.Estado.ENTREGADO:
@@ -75,11 +139,8 @@ def cambiar_estado_pedido(pedido, nuevo_estado):
     if nuevo_estado == Pedido.Estado.ENTREGADO:
         query = query.filter(fecha_entrega__isnull=True)
     if nuevo_estado == Pedido.Estado.CANCELADO:
-        query = query.filter(pagos__isnull=True)
-    try:
-        updated = query.update(**updates)
-    except OperationalError as error:
-        raise ValidationError({'detail': 'No se pudo actualizar el pedido por un conflicto de concurrencia. Intente nuevamente.'}) from error
+        query = query.exclude(pagos__estado=Pago.Estado.VIGENTE)
+    updated = query.update(**updates)
     if not updated:
         raise ValidationError({'estado': 'El pedido fue actualizado por otra operación. Intente nuevamente.'})
     pedido.refresh_from_db()
@@ -100,8 +161,11 @@ def eliminar_jornada(jornada):
     jornada.delete()
 
 
-@transaction.atomic
+@transaccion_monetaria
 def guardar_pedido(*, jornada, usuario, datos, pedido=None):
+    jornada = Jornada.objects.get(pk=jornada.pk)
+    if pedido:
+        pedido = Pedido.objects.select_related('jornada').prefetch_related('detalles__producto', 'pagos').get(pk=pedido.pk)
     try:
         validar_jornada_abierta(jornada)
     except DjangoValidationError as error:
@@ -130,12 +194,11 @@ def guardar_pedido(*, jornada, usuario, datos, pedido=None):
         detalles_existentes = {detalle.producto_id: detalle for detalle in pedido.detalles.select_related('producto')}
         nuevas_lineas = {(detail['producto_id'], detail['cantidad']) for detail in datos['detalles']}
         lineas_actuales = {(detalle.producto_id, detalle.cantidad) for detalle in detalles_existentes.values()}
-        if pedido.pagos.exists() and nuevas_lineas != lineas_actuales:
-            importe_pagado = sum((pago.monto for pago in pedido.pagos.all()), Decimal('0.00'))
+        if nuevas_lineas != lineas_actuales:
+            importe_pagado = resumen_pago_pedido(pedido)[1]
             total_propuesto = sum((detail['cantidad'] * (detalles_existentes[detail['producto_id']].precio_unitario if detail['producto_id'] in detalles_existentes else productos[detail['producto_id']].precio) for detail in datos['detalles']), Decimal('0.00'))
             if total_propuesto < importe_pagado:
                 raise ValidationError({'detalles': 'El total del pedido no puede ser menor al importe ya pagado.'})
-            raise ValidationError({'detalles': 'No se pueden modificar productos ni cantidades de un pedido con pagos registrados.'})
         pedido.nombre_cliente = datos['nombre_cliente']
         pedido.tipo = datos['tipo']
         pedido.observaciones = datos.get('observaciones', pedido.observaciones)

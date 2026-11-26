@@ -142,3 +142,22 @@ class PedidosApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('importe ya pagado', response.json()['detalles'])
         self.assertEqual(Pago.objects.filter(pedido=pedido).count(), 1)
+
+    def test_busqueda_filtros_estado_pago_y_ordenamiento(self):
+        first = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='José Castro', tipo='reserva', detalles=[{'producto_id': self.plato.id, 'cantidad': 1}])).json()
+        second = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='Mabel Castro', tipo='venta_directa', detalles=[{'producto_id': self.bebida.id, 'cantidad': 3}])).json()
+        pedido = Pedido.objects.get(pk=second['id'])
+        Pago.objects.create(pedido=pedido, monto=Decimal('5.00'), metodo='efectivo', registrado_por=self.user)
+        url = reverse('pedido-list', args=[self.jornada.id])
+        self.assertEqual([item['id'] for item in self.client.get(f'{url}?busqueda=jose').json()], [first['id']])
+        self.assertEqual([item['id'] for item in self.client.get(f'{url}?busqueda=%23{first["id"]}').json()], [first['id']])
+        self.assertEqual(self.client.get(f'{url}?busqueda=999999999999999999999').json(), [])
+        self.assertEqual([item['id'] for item in self.client.get(f'{url}?tipo=venta_directa&estado_pago=parcial').json()], [second['id']])
+        self.assertEqual(self.client.get(f'{url}?orden=invalido').status_code, 400)
+
+    def test_listado_no_mezcla_jornadas_y_pedidos_gratuitos_pagados(self):
+        self.plato.precio = Decimal('0.00'); self.plato.save()
+        free = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 1}])).json()
+        other = Jornada.objects.create(nombre='Otra', fecha=date(2026, 8, 1), creado_por=self.user)
+        self.assertEqual(self.client.get(f'{reverse("pedido-list", args=[self.jornada.id])}?estado_pago=pagado').json()[0]['id'], free['id'])
+        self.assertEqual(self.client.get(reverse('pedido-list', args=[other.id])).json(), [])

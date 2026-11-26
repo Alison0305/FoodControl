@@ -25,8 +25,8 @@ function PedidosPage() {
   const selectedJornadaIdRef = useRef(selectedJornadaId)
   const loadRequestRef = useRef(0)
   const detailRequestRef = useRef(0)
-  const [pedidos, setPedidos] = useState([]); const [productos, setProductos] = useState([]); const [loadedJornadaId, setLoadedJornadaId] = useState(); const [loading, setLoading] = useState(false); const [loadError, setLoadError] = useState(''); const [loadErrorJornadaId, setLoadErrorJornadaId] = useState(); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [formPedido, setFormPedido] = useState(undefined); const [detail, setDetail] = useState(null); const [saving, setSaving] = useState(false); const [filters, setFiltersState] = useState({ busqueda: '', tipo: '', estado: '', estado_pago: '', orden: 'recientes' })
-  function setFilters(nextFilters) { setFiltersState(nextFilters) }
+  const [pedidos, setPedidos] = useState([]); const [productos, setProductos] = useState([]); const [loadedJornadaId, setLoadedJornadaId] = useState(); const [loading, setLoading] = useState(false); const [loadError, setLoadError] = useState(''); const [loadErrorJornadaId, setLoadErrorJornadaId] = useState(); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [formPedido, setFormPedido] = useState(undefined); const [detail, setDetail] = useState(null); const [saving, setSaving] = useState(false); const [filters, setFiltersState] = useState({ jornadaId: null, values: { busqueda: '', tipo: '', estado: '', estado_pago: '', orden: 'recientes' } })
+  function setFilters(nextFilters) { setFiltersState({ jornadaId: selectedJornadaId, values: nextFilters }) }
   async function load() { if (!selectedJornada) return; const id = selectedJornada.id; const requestId = ++loadRequestRef.current; setLoading(true); setLoadError(''); try { const [loadedPedidos, loadedProductos] = await Promise.all([listPedidos(id), listProductos(id)]); if (selectedJornadaIdRef.current === id && loadRequestRef.current === requestId) { setPedidos(loadedPedidos); setProductos(loadedProductos); setLoadedJornadaId(id) } } catch (requestError) { if (selectedJornadaIdRef.current !== id || loadRequestRef.current !== requestId) return; if (requestError instanceof ApiError && requestError.status === 403) clearSession(); else { setLoadError('No fue posible cargar los pedidos. Revise la conexión e intente nuevamente.'); setLoadErrorJornadaId(id) } } finally { if (selectedJornadaIdRef.current === id && loadRequestRef.current === requestId) setLoading(false) } }
   const reload = useEffectEvent(() => load())
   useEffect(() => { selectedJornadaIdRef.current = selectedJornadaId; loadRequestRef.current += 1; detailRequestRef.current += 1 }, [selectedJornadaId])
@@ -36,7 +36,7 @@ function PedidosPage() {
   if (!selectedJornada) return <div className="space-y-8"><PageHeader title="Pedidos y reservas" description="Registre los pedidos de cada jornada." /><EmptyState icon={ClipboardList} title="Seleccione una jornada" description="Elija una jornada abierta para registrar y consultar pedidos." /><Link to="/jornadas"><Button>Ir a jornadas</Button></Link></div>
   const editable = (pedido) => selectedJornada.estado === 'abierta' && !['entregado', 'cancelado'].includes(pedido.estado)
   const hasCurrentData = loadedJornadaId === selectedJornadaId
-  const activeFilters = filters
+  const activeFilters = filters.jornadaId === selectedJornadaId ? filters.values : { busqueda: '', tipo: '', estado: '', estado_pago: '', orden: 'recientes' }
   const visiblePedidos = hasCurrentData ? filterOrders(pedidos, activeFilters) : []
   const visibleProductos = hasCurrentData ? productos : []
   const currentLoadError = loadErrorJornadaId === selectedJornadaId ? loadError : ''

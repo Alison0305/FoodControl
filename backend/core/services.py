@@ -33,10 +33,13 @@ def normalizar_busqueda(value):
 
 
 def filtrar_pedidos(pedidos, *, busqueda='', tipo='', estado='', estado_pago='', orden='recientes'):
-    normalized = normalizar_busqueda(busqueda.removeprefix('#'))
+    normalized = normalizar_busqueda(busqueda)
+    if normalized.startswith('#'):
+        normalized = normalized[1:].strip()
+    is_identifier = normalized.isascii() and normalized.isdecimal() and len(normalized) <= 18
     filtered = []
     for pedido in pedidos:
-        matches_search = not normalized or (normalized.isdigit() and pedido.id == int(normalized)) or normalized in normalizar_busqueda(pedido.nombre_cliente)
+        matches_search = not normalized or (is_identifier and pedido.id == int(normalized)) or (not is_identifier and normalized in normalizar_busqueda(pedido.nombre_cliente))
         if matches_search and (not tipo or pedido.tipo == tipo) and (not estado or pedido.estado == estado) and (not estado_pago or estado_pago_pedido(pedido) == estado_pago):
             filtered.append(pedido)
     if orden == 'antiguos':

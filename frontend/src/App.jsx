@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardList, CreditCard, Soup } from 'lucide-react'
+import { BookOpen, ClipboardList, CreditCard } from 'lucide-react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
 import { LoadingIndicator } from './components/ui.jsx'
@@ -7,6 +7,7 @@ import MainLayout from './layouts/MainLayout.jsx'
 import HomePage from './pages/HomePage.jsx'
 import JornadasPage from './pages/JornadasPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import MenuPage from './pages/MenuPage.jsx'
 import ModulePage from './pages/ModulePage.jsx'
 
 function PrivateRoute() {
@@ -25,7 +26,7 @@ function App() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/jornadas" element={<JornadasPage />} />
-          <Route path="/menu" element={<ModulePage title="Platos y bebidas" description="Administra el menú disponible para cada jornada." icon={Soup} />} />
+          <Route path="/menu" element={<MenuPage />} />
           <Route path="/pedidos" element={<ModulePage title="Pedidos y reservas" description="Gestiona los pedidos y reservas de tus clientes." icon={ClipboardList} />} />
           <Route path="/pagos" element={<ModulePage title="Gestión de pagos" description="Registra los pagos en efectivo y mediante QR." icon={CreditCard} />} />
           <Route path="/historial" element={<ModulePage title="Historial de ventas" description="Consulta las jornadas y ventas anteriores." icon={BookOpen} />} />

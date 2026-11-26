@@ -131,7 +131,7 @@ Rutas privadas disponibles:
 | `/pagos` | Gestión de pagos. |
 | `/historial` | Historial de ventas. |
 
-Las secciones de menú, pedidos, pagos e historial muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios.
+Las secciones de pedidos, pagos e historial muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios.
 
 La API exige autenticación por defecto. Solo `/api/health/`, `/api/auth/csrf/` y `/api/auth/login/` permanecen públicos de forma explícita; las solicitudes que cambian estado conservan protección CSRF.
 
@@ -160,6 +160,29 @@ Reglas del módulo:
 
 Para usar el módulo, inicie sesión, abra **Jornadas**, cree una jornada con **Nueva jornada** y selecciónela mediante **Seleccionar**. La página de inicio mostrará la jornada activa. Antes de cerrar, reabrir o eliminar una jornada, la interfaz solicita confirmación mediante un diálogo accesible. La eliminación es permanente y también elimina los datos asociados a esa jornada.
 
+## Platos y bebidas
+
+El módulo **Platos y bebidas** trabaja exclusivamente con la jornada abierta seleccionada. Permite registrar platos y bebidas, editar nombre, tipo o precio, filtrar por tipo y disponibilidad, y activar, desactivar o eliminar productos.
+
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/api/jornadas/{id}/productos/` | Lista los productos de una jornada; admite `tipo=plato|bebida` y `activo=true|false`. |
+| `POST` | `/api/jornadas/{id}/productos/` | Crea un producto activo en una jornada abierta. |
+| `GET` | `/api/productos/{id}/` | Consulta un producto. |
+| `PATCH` | `/api/productos/{id}/` | Edita nombre, tipo o precio de un producto en una jornada abierta. |
+| `DELETE` | `/api/productos/{id}/` | Elimina un producto sin pedidos asociados y de una jornada abierta. |
+| `POST` | `/api/productos/{id}/activar/` | Activa un producto de una jornada abierta. |
+| `POST` | `/api/productos/{id}/desactivar/` | Desactiva un producto de una jornada abierta. |
+
+Reglas del módulo:
+
+- Todas las rutas requieren sesión autenticada y CSRF para sus operaciones de escritura.
+- El nombre, tipo y precio son obligatorios. El precio usa dos decimales, no admite valores negativos y `Bs 0.00` es válido.
+- Los productos se aíslan por jornada y no pueden reasignarse a otra jornada.
+- Una jornada cerrada puede consultarse, pero no admite altas, ediciones, activaciones, desactivaciones ni eliminaciones de productos.
+- Un producto con detalles de pedido conserva su historial y no puede eliminarse; debe desactivarse para dejar de ofrecerse en pedidos nuevos.
+- Cambiar el precio de un producto no altera los precios unitarios ya guardados en los detalles de pedidos.
+
 ## Verificaciones
 
 ```powershell
@@ -173,4 +196,4 @@ npm run build
 
 ## Alcance actual
 
-El esquema de datos, la autenticación por sesiones, la interfaz principal y la gestión de jornadas están implementados. Aún no incluye operaciones de menú, pedidos, pagos o historial, dashboard estadístico, cálculo de totales ni transiciones de estado de pedidos; esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos, la autenticación por sesiones, la interfaz principal, la gestión de jornadas y el catálogo de platos y bebidas están implementados. Aún no incluye pedidos, pagos o historial, dashboard estadístico, cálculo de totales ni transiciones de estado de pedidos; esos módulos se implementarán en sus issues correspondientes.

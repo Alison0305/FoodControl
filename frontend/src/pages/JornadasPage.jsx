@@ -186,7 +186,7 @@ function JornadasPage() {
       )}
 
       {formJornada !== undefined && <JornadaFormModal key={formJornada?.id || 'new'} jornada={formJornada} isSaving={isSaving} onClose={() => setFormJornada(undefined)} onSave={handleSave} />}
-      {confirmation && <ConfirmDialog action={confirmation.action} jornada={confirmation.jornada} isLoading={isChangingState} error={confirmationError} onCancel={() => { setConfirmationError(''); setConfirmation(null) }} onConfirm={handleConfirmState} />}
+      {confirmation && <ConfirmDialog action={confirmation.action} subject={`la jornada ${confirmation.jornada.nombre}`} isLoading={isChangingState} error={confirmationError} onCancel={() => { setConfirmationError(''); setConfirmation(null) }} onConfirm={handleConfirmState} />}
       {detailJornada && (
         <Modal title="Detalle de jornada" onClose={() => setDetailJornada(null)}>
           {isLoadingDetail ? <LoadingIndicator label="Consultando jornada..." /> : <div className="space-y-4 text-app-description text-food-dark"><div><p className="font-semibold text-food-charcoal">{detailJornada.nombre}</p><p className="mt-1">{formatDate(detailJornada.fecha)}</p></div><JornadaStatusBadge estado={detailJornada.estado} /><p>Creada por {detailJornada.creado_por}.</p></div>}

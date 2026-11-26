@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
 
-function Modal({ title, titleClassName = 'text-app-subtitle', children, onClose }) {
+function Modal({ title, titleIcon: TitleIcon, titleIconClassName = '', titleClassName = 'text-app-subtitle', children, onClose }) {
   const dialogRef = useRef(null)
   const titleId = useId()
 
@@ -51,7 +51,8 @@ function Modal({ title, titleClassName = 'text-app-subtitle', children, onClose 
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <button className="absolute inset-0 bg-food-charcoal/45" type="button" onClick={onClose} aria-label="Cerrar ventana" />
       <section className="relative max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-food-white p-7 shadow-xl sm:p-9" ref={dialogRef} tabIndex="-1">
-        <header className="pr-14">
+        <header className="flex items-center gap-3 pr-14">
+          {TitleIcon && <span className={`grid size-10 shrink-0 place-items-center rounded-full ${titleIconClassName}`}><TitleIcon size={22} aria-hidden="true" /></span>}
           <h2 className={`${titleClassName} font-bold text-food-charcoal`} id={titleId}>{title}</h2>
         </header>
         <button

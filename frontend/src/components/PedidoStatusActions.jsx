@@ -3,12 +3,14 @@ import { useState } from 'react'
 
 import Modal from './Modal.jsx'
 import { Button, ErrorMessage } from './ui.jsx'
+import { availableOrderActions } from '../utils/orderStatus.js'
 
 function PedidoStatusActions({ pedido, disabled, onChange }) {
   const [isCanceling, setIsCanceling] = useState(false)
   const [error, setError] = useState('')
-  const canPrepare = pedido.estado === 'en_espera'
-  const canDeliver = pedido.estado === 'en_preparacion'
+  const actions = availableOrderActions(pedido.estado)
+  const canPrepare = actions.includes('preparar')
+  const canDeliver = actions.includes('entregar')
 
   async function change(estado) {
     if (disabled) return

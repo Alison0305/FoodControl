@@ -132,7 +132,7 @@ class PedidoWriteSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        protected = {'jornada', 'estado', 'registrado_por', 'fecha_creacion'} & set(self.initial_data)
+        protected = {'jornada', 'estado', 'registrado_por', 'fecha_creacion', 'fecha_entrega'} & set(self.initial_data)
         if protected:
             raise serializers.ValidationError({field: 'Este campo no se puede modificar.' for field in protected})
         if not attrs['detalles']:

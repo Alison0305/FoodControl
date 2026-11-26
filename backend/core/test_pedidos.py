@@ -180,3 +180,27 @@ class PedidosApiTests(TestCase):
         Pago.objects.create(pedido=pedido, monto=Decimal('1.00'), metodo='efectivo', registrado_por=self.user)
         self.assertEqual(self.post(url, {'estado': Pedido.Estado.CANCELADO}).status_code, 400)
         self.assertTrue(Pedido.objects.filter(pk=pedido.id, estado=Pedido.Estado.EN_ESPERA).exists())
+
+    def test_cancelacion_desde_espera_conserva_datos_e_importes(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(observaciones='Sin ají')).json()
+        response = self.post(reverse('pedido-estado', args=[created['id']]), {'estado': Pedido.Estado.CANCELADO})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['estado'], Pedido.Estado.CANCELADO)
+        self.assertEqual(response.json()['total'], created['total'])
+        self.assertEqual(response.json()['observaciones'], 'Sin ají')
+
+    def test_cancelacion_desde_preparacion_y_jornada_cerrada(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).json()
+        url = reverse('pedido-estado', args=[created['id']])
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 200)
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.CANCELADO}).status_code, 200)
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='Otra')).json()
+        self.jornada.estado = Jornada.Estado.CERRADA; self.jornada.save()
+        self.assertEqual(self.post(reverse('pedido-estado', args=[created['id']]), {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 400)
+
+    def test_endpoint_estado_exige_csrf_y_autenticacion(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).json()
+        url = reverse('pedido-estado', args=[created['id']])
+        self.assertEqual(self.client.post(url, {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 403)
+        anonymous = Client(enforce_csrf_checks=True)
+        self.assertEqual(anonymous.post(url, {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 403)

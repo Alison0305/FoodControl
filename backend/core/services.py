@@ -2,11 +2,11 @@ from decimal import Decimal
 import unicodedata
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.db import OperationalError, transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from .models import DetallePedido, Pago, Pedido, Producto
+from .models import DetallePedido, Jornada, Pago, Pedido, Producto
 from .validators import validar_jornada_abierta
 
 
@@ -71,7 +71,15 @@ def cambiar_estado_pedido(pedido, nuevo_estado):
     updates = {'estado': nuevo_estado}
     if nuevo_estado == Pedido.Estado.ENTREGADO:
         updates['fecha_entrega'] = timezone.now()
-    updated = Pedido.objects.filter(pk=pedido.pk, estado=pedido.estado).update(**updates)
+    query = Pedido.objects.filter(pk=pedido.pk, estado=pedido.estado, jornada__estado=Jornada.Estado.ABIERTA)
+    if nuevo_estado == Pedido.Estado.ENTREGADO:
+        query = query.filter(fecha_entrega__isnull=True)
+    if nuevo_estado == Pedido.Estado.CANCELADO:
+        query = query.filter(pagos__isnull=True)
+    try:
+        updated = query.update(**updates)
+    except OperationalError as error:
+        raise ValidationError({'detail': 'No se pudo actualizar el pedido por un conflicto de concurrencia. Intente nuevamente.'}) from error
     if not updated:
         raise ValidationError({'estado': 'El pedido fue actualizado por otra operación. Intente nuevamente.'})
     pedido.refresh_from_db()

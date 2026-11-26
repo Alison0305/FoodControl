@@ -1,10 +1,9 @@
-from decimal import Decimal
-
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import DetallePedido, Jornada, Pedido, Producto
 from .validators import validar_jornada_abierta
+from .services import importes_pedido, subtotal_detalle
 
 
 class JornadaSerializer(serializers.ModelSerializer):
@@ -85,7 +84,7 @@ class DetallePedidoSerializer(serializers.ModelSerializer):
     subtotal = serializers.SerializerMethodField()
 
     def get_subtotal(self, detail):
-        return format(detail.cantidad * detail.precio_unitario, '.2f')
+        return format(subtotal_detalle(detail), '.2f')
 
     class Meta:
         model = DetallePedido
@@ -105,10 +104,10 @@ class PedidoSerializer(serializers.ModelSerializer):
     cantidad_total = serializers.SerializerMethodField()
 
     def get_total(self, pedido):
-        return format(sum((detail.cantidad * detail.precio_unitario for detail in pedido.detalles.all()), Decimal('0.00')), '.2f')
+        return format(importes_pedido(pedido.detalles.all())[0], '.2f')
 
     def get_cantidad_total(self, pedido):
-        return sum(detail.cantidad for detail in pedido.detalles.all())
+        return importes_pedido(pedido.detalles.all())[1]
 
     class Meta:
         model = Pedido

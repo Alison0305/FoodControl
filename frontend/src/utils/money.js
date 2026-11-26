@@ -12,15 +12,24 @@ export function formatCents(cents) {
 
 export function lineSubtotal(price, quantity) {
   const cents = centsFrom(price)
-  const units = Number(quantity)
-  if (cents === null || !Number.isSafeInteger(units) || units < 1) return null
-  return cents * BigInt(units)
+  const units = quantityFrom(quantity)
+  if (cents === null || units === null) return null
+  return cents * units
+}
+
+export function quantityFrom(value) {
+  const text = String(value).trim()
+  if (!/^[1-9]\d*$/.test(text)) return null
+  const quantity = BigInt(text)
+  return quantity <= MAX_QUANTITY ? quantity : null
 }
 
 export function orderTotals(details) {
   return details.reduce((totals, detail) => {
     const subtotal = lineSubtotal(detail.precio, detail.cantidad)
-    if (subtotal === null) return { valid: false, units: 0, total: 0n }
-    return { valid: true, units: totals.units + Number(detail.cantidad), total: totals.total + subtotal }
-  }, { valid: true, units: 0, total: 0n })
+    const quantity = quantityFrom(detail.cantidad)
+    if (!totals.valid || subtotal === null || quantity === null) return { ...totals, valid: false }
+    return { valid: true, units: totals.units + quantity, total: totals.total + subtotal }
+  }, { valid: true, units: 0n, total: 0n })
 }
+export const MAX_QUANTITY = 2147483647n

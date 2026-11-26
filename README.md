@@ -131,7 +131,7 @@ Rutas privadas disponibles:
 | `/pagos` | Gestión de pagos. |
 | `/historial` | Historial de ventas. |
 
-Las secciones de pedidos, pagos e historial muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios.
+Las secciones de pagos e historial muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios.
 
 La API exige autenticación por defecto. Solo `/api/health/`, `/api/auth/csrf/` y `/api/auth/login/` permanecen públicos de forma explícita; las solicitudes que cambian estado conservan protección CSRF.
 
@@ -182,6 +182,26 @@ Reglas del módulo:
 - Una jornada cerrada puede consultarse, pero no admite altas, ediciones, activaciones, desactivaciones ni eliminaciones de productos.
 - Un producto con detalles de pedido conserva su historial y no puede eliminarse; debe desactivarse para dejar de ofrecerse en pedidos nuevos.
 - Cambiar el precio de un producto no altera los precios unitarios ya guardados en los detalles de pedidos.
+
+## Pedidos y reservas
+
+El módulo **Pedidos y reservas** registra reservas y ventas directas dentro de la jornada seleccionada, con varios productos y cantidades por pedido.
+
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/api/jornadas/{id}/pedidos/` | Lista los pedidos de una jornada. |
+| `POST` | `/api/jornadas/{id}/pedidos/` | Registra un pedido o reserva con sus detalles. |
+| `GET` | `/api/pedidos/{id}/` | Consulta un pedido y sus precios históricos. |
+| `PATCH` | `/api/pedidos/{id}/` | Edita un pedido pendiente de una jornada abierta. |
+
+Reglas del módulo:
+
+- El identificador automático del pedido es único y su estado inicial es `en_espera`.
+- Cada pedido requiere cliente, tipo y al menos un producto sin duplicados; las cantidades son enteros mayores que cero.
+- El backend asigna el precio vigente para productos nuevos y conserva el precio histórico de líneas existentes.
+- Solo se pueden agregar productos activos de la misma jornada. Las líneas históricas pueden conservar productos que luego se desactiven.
+- No se puede cambiar la jornada, estado, usuario registrador ni fecha de creación directamente.
+- Las escrituras son transaccionales y se bloquean en jornadas cerradas, pedidos entregados o cancelados, o cambios de líneas cuando ya existen pagos.
 
 ## Verificaciones
 

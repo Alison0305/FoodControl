@@ -14,6 +14,8 @@ from .views import (
     productos_jornada,
     activar_producto,
     desactivar_producto,
+    pedido_detail,
+    pedidos_jornada,
 )
 
 urlpatterns = [
@@ -30,4 +32,6 @@ urlpatterns = [
     path('productos/<int:producto_id>/', producto_detail, name='producto-detail'),
     path('productos/<int:producto_id>/activar/', activar_producto, name='producto-activar'),
     path('productos/<int:producto_id>/desactivar/', desactivar_producto, name='producto-desactivar'),
+    path('jornadas/<int:jornada_id>/pedidos/', pedidos_jornada, name='pedido-list'),
+    path('pedidos/<int:pedido_id>/', pedido_detail, name='pedido-detail'),
 ]

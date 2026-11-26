@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Jornada, Producto
+from .models import DetallePedido, Jornada, Pedido, Producto
 from .validators import validar_jornada_abierta
 
 
@@ -74,3 +74,53 @@ class ProductoSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return Producto.objects.create(jornada=self.context['jornada'], **validated_data)
+
+
+class DetallePedidoSerializer(serializers.ModelSerializer):
+    producto_id = serializers.IntegerField(source='producto.id', read_only=True)
+    producto_nombre = serializers.CharField(source='producto.nombre', read_only=True)
+    producto_tipo = serializers.CharField(source='producto.tipo', read_only=True)
+
+    class Meta:
+        model = DetallePedido
+        fields = ('producto_id', 'producto_nombre', 'producto_tipo', 'cantidad', 'precio_unitario')
+
+
+class DetallePedidoInputSerializer(serializers.Serializer):
+    producto_id = serializers.IntegerField(min_value=1)
+    cantidad = serializers.IntegerField(min_value=1, max_value=2147483647)
+
+
+class PedidoSerializer(serializers.ModelSerializer):
+    jornada = serializers.IntegerField(source='jornada_id', read_only=True)
+    registrado_por = serializers.CharField(source='registrado_por.username', read_only=True)
+    detalles = DetallePedidoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Pedido
+        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'observaciones', 'registrado_por', 'fecha_creacion', 'detalles')
+        read_only_fields = ('id', 'jornada', 'estado', 'registrado_por', 'fecha_creacion', 'detalles')
+
+
+class PedidoWriteSerializer(serializers.Serializer):
+    nombre_cliente = serializers.CharField(max_length=100)
+    tipo = serializers.ChoiceField(choices=Pedido.Tipo.choices)
+    observaciones = serializers.CharField(required=False, allow_blank=True)
+    detalles = DetallePedidoInputSerializer(many=True)
+
+    def validate_nombre_cliente(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('El nombre del cliente es obligatorio.')
+        return value
+
+    def validate(self, attrs):
+        protected = {'jornada', 'estado', 'registrado_por', 'fecha_creacion'} & set(self.initial_data)
+        if protected:
+            raise serializers.ValidationError({field: 'Este campo no se puede modificar.' for field in protected})
+        if not attrs['detalles']:
+            raise serializers.ValidationError({'detalles': 'Debe seleccionar al menos un producto.'})
+        product_ids = [detail['producto_id'] for detail in attrs['detalles']]
+        if len(product_ids) != len(set(product_ids)):
+            raise serializers.ValidationError({'detalles': 'No puede repetir productos en un pedido.'})
+        return attrs

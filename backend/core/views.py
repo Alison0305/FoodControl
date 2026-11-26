@@ -9,9 +9,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Jornada, Producto
-from .serializers import JornadaSerializer, ProductoSerializer
-from .services import eliminar_jornada
+from .models import Jornada, Pedido, Producto
+from .serializers import JornadaSerializer, PedidoSerializer, PedidoWriteSerializer, ProductoSerializer
+from .services import eliminar_jornada, guardar_pedido
 from .validators import validar_jornada_abierta
 
 @api_view(['GET'])
@@ -216,3 +216,32 @@ def activar_producto(request, producto_id):
     producto.activo = True
     producto.save(update_fields=['activo'])
     return Response(ProductoSerializer(producto).data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def pedidos_jornada(request, jornada_id):
+    jornada = get_object_or_404(Jornada, pk=jornada_id)
+    if request.method == 'GET':
+        pedidos = Pedido.objects.filter(jornada=jornada).select_related('registrado_por').prefetch_related('detalles__producto').order_by('-fecha_creacion', '-id')
+        return Response(PedidoSerializer(pedidos, many=True).data)
+    serializer = PedidoWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    pedido = guardar_pedido(jornada=jornada, usuario=request.user, datos=serializer.validated_data)
+    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto').get(pk=pedido.pk)
+    return Response(PedidoSerializer(pedido).data, status=201)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def pedido_detail(request, pedido_id):
+    pedido = get_object_or_404(Pedido.objects.select_related('jornada', 'registrado_por').prefetch_related('detalles__producto'), pk=pedido_id)
+    if request.method == 'GET':
+        return Response(PedidoSerializer(pedido).data)
+    serializer = PedidoWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    pedido = guardar_pedido(jornada=pedido.jornada, usuario=request.user, datos=serializer.validated_data, pedido=pedido)
+    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto').get(pk=pedido.pk)
+    return Response(PedidoSerializer(pedido).data)

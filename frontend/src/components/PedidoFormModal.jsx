@@ -25,7 +25,7 @@ function PedidoFormModal({ pedido, productos, isSaving, onClose, onSave }) {
   const [error, setError] = useState('')
   const originalPrices = new Map(pedido?.detalles.map((detalle) => [detalle.producto_id, detalle.precio_unitario]))
   const selectedIds = new Set(detalles.map((detalle) => detalle.producto_id))
-  const disponibles = productos.filter((producto) => producto.activo && !selectedIds.has(producto.id) && producto.nombre.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()))
+  const disponibles = productos.filter((producto) => producto.activo && !selectedIds.has(producto.id) && producto.nombre.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim())).map((producto) => ({ ...producto, precio: originalPrices.get(producto.id) ?? producto.precio }))
   const totals = orderTotals(detalles)
 
   function updateQuantity(productoId, value) {

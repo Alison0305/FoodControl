@@ -205,6 +205,9 @@ Reglas del módulo:
 - Cada detalle devuelve `subtotal`; cada pedido devuelve `cantidad_total` y `total`. Son campos calculados, no se almacenan ni se aceptan desde el cliente.
 - El subtotal es `cantidad × precio_unitario` histórico, y el total es la suma de subtotales. Por ejemplo, 3 platos de `Bs 25.00` y 2 bebidas de `Bs 5.00` generan subtotales de `Bs 75.00` y `Bs 10.00`, con total `Bs 85.00` y 5 unidades.
 - Los importes de la API se representan como cadenas decimales con dos posiciones, incluso para productos gratuitos.
+- El listado de pedidos admite `busqueda`, `tipo`, `estado`, `estado_pago` y `orden`. La búsqueda ignora tildes y mayúsculas; acepta nombres o el identificador exacto, por ejemplo `Castro`, `Jose` o `#3`.
+- Los estados de pago son `pendiente`, `parcial` y `pagado`, calculados con el total histórico y los pagos asociados. Los pedidos gratuitos se consideran pagados.
+- Las opciones de orden son `recientes`, `antiguos`, `cliente_az`, `cliente_za`, `importe_mayor` e `importe_menor`.
 
 ## Verificaciones
 

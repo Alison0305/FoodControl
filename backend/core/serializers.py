@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from .models import DetallePedido, Jornada, Pedido, Producto
 from .validators import validar_jornada_abierta
-from .services import importes_pedido, subtotal_detalle
+from .services import estado_pago_pedido, importes_pedido, subtotal_detalle
 
 
 class JornadaSerializer(serializers.ModelSerializer):
@@ -102,6 +102,7 @@ class PedidoSerializer(serializers.ModelSerializer):
     detalles = DetallePedidoSerializer(many=True, read_only=True)
     total = serializers.SerializerMethodField()
     cantidad_total = serializers.SerializerMethodField()
+    estado_pago = serializers.SerializerMethodField()
 
     def get_total(self, pedido):
         return format(importes_pedido(pedido.detalles.all())[0], '.2f')
@@ -109,9 +110,12 @@ class PedidoSerializer(serializers.ModelSerializer):
     def get_cantidad_total(self, pedido):
         return importes_pedido(pedido.detalles.all())[1]
 
+    def get_estado_pago(self, pedido):
+        return estado_pago_pedido(pedido)
+
     class Meta:
         model = Pedido
-        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'observaciones', 'registrado_por', 'fecha_creacion', 'detalles', 'total', 'cantidad_total')
+        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'estado_pago', 'observaciones', 'registrado_por', 'fecha_creacion', 'detalles', 'total', 'cantidad_total')
         read_only_fields = ('id', 'jornada', 'estado', 'registrado_por', 'fecha_creacion', 'detalles')
 
 

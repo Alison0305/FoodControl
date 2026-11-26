@@ -103,6 +103,14 @@ class PagosApiTests(TestCase):
         self.pedido.estado = Pedido.Estado.CANCELADO; self.pedido.save()
         self.assertEqual(self.pago('1.00').status_code, 400)
 
+    def test_rechaza_edicion_valida_con_total_inferior_al_pagado(self):
+        self.assertEqual(self.pago('80.00').status_code, 201)
+        menor = Producto.objects.create(jornada=self.jornada, nombre='Menú menor', tipo='plato', precio=Decimal('50.00'))
+        data = {'nombre_cliente': 'Ana', 'tipo': 'reserva', 'observaciones': '', 'detalles': [{'producto_id': menor.id, 'cantidad': 1}]}
+        response = self.client.patch(reverse('pedido-detail', args=[self.pedido.id]), data, content_type='application/json', HTTP_X_CSRFTOKEN=self.client.get(reverse('auth-csrf')).cookies['csrftoken'].value)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(DetallePedido.objects.get(pedido=self.pedido).producto_id, self.producto.id)
+
 
 class PagosConcurrenciaTests(TransactionTestCase):
     reset_sequences = True
@@ -118,6 +126,7 @@ class PagosConcurrenciaTests(TransactionTestCase):
     def run_concurrently(self, *operations):
         barrier = Barrier(len(operations))
         results = []
+        unexpected = []
 
         def run(operation):
             close_old_connections()
@@ -127,12 +136,18 @@ class PagosConcurrenciaTests(TransactionTestCase):
                 results.append('ok')
             except ValidationError:
                 results.append('conflicto')
+            except Exception as error:
+                unexpected.append(error)
             finally:
                 connections['default'].close()
 
         threads = [Thread(target=run, args=(operation,)) for operation in operations]
         for thread in threads: thread.start()
-        for thread in threads: thread.join()
+        for thread in threads: thread.join(timeout=25)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(unexpected, [])
+        self.assertTrue(results)
+        self.assertTrue(set(results) <= {'ok', 'conflicto'})
         return results
 
     def test_pagos_simultaneos_no_sobrepagan(self):

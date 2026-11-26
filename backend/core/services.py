@@ -66,12 +66,14 @@ def registrar_pago(*, pedido, usuario, monto, metodo, identificador):
     if monto > saldo:
         raise ValidationError({'monto': 'El monto no puede superar el saldo pendiente.'})
     try:
-        return Pago.objects.create(pedido=pedido, monto=monto, metodo=metodo, registrado_por=usuario, identificador_idempotencia=identificador)
-    except IntegrityError as error:
+        # The savepoint keeps the outer IMMEDIATE transaction usable after a UUID race.
+        with transaction.atomic():
+            return Pago.objects.create(pedido=pedido, monto=monto, metodo=metodo, registrado_por=usuario, identificador_idempotencia=identificador)
+    except IntegrityError:
         existente = Pago.objects.filter(identificador_idempotencia=identificador).first()
         if existente and existente.pedido_id == pedido.id and existente.monto == monto and existente.metodo == metodo:
             return existente
-        raise ValidationError({'identificador_idempotencia': 'No se pudo registrar el pago por un conflicto de concurrencia.'}) from error
+        raise
 
 
 @transaccion_monetaria
@@ -138,10 +140,7 @@ def cambiar_estado_pedido(pedido, nuevo_estado):
         query = query.filter(fecha_entrega__isnull=True)
     if nuevo_estado == Pedido.Estado.CANCELADO:
         query = query.exclude(pagos__estado=Pago.Estado.VIGENTE)
-    try:
-        updated = query.update(**updates)
-    except OperationalError as error:
-        raise ValidationError({'detail': 'No se pudo actualizar el pedido por un conflicto de concurrencia. Intente nuevamente.'}) from error
+    updated = query.update(**updates)
     if not updated:
         raise ValidationError({'estado': 'El pedido fue actualizado por otra operación. Intente nuevamente.'})
     pedido.refresh_from_db()

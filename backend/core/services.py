@@ -47,7 +47,7 @@ def filtrar_pedidos(pedidos, *, busqueda='', tipo='', estado='', estado_pago='',
     if orden == 'cliente_az':
         return sorted(filtered, key=lambda pedido: (normalizar_busqueda(pedido.nombre_cliente), pedido.fecha_creacion, pedido.id))
     if orden == 'cliente_za':
-        return sorted(filtered, key=lambda pedido: (normalizar_busqueda(pedido.nombre_cliente), pedido.fecha_creacion, pedido.id), reverse=True)
+        return sorted(sorted(filtered, key=lambda pedido: (pedido.fecha_creacion, pedido.id)), key=lambda pedido: normalizar_busqueda(pedido.nombre_cliente), reverse=True)
     if orden in ('importe_mayor', 'importe_menor'):
         return sorted(filtered, key=lambda pedido: (importes_pedido(pedido.detalles.all())[0], pedido.fecha_creacion, pedido.id), reverse=orden == 'importe_mayor')
     return sorted(filtered, key=lambda pedido: (pedido.fecha_creacion, pedido.id), reverse=True)

@@ -4,12 +4,12 @@ export function Button({ children, className = '', variant = 'primary', ...props
     secondary: 'border border-food-sage bg-food-white text-food-charcoal hover:bg-food-beige focus:ring-food-sage-light',
     ghost: 'text-food-dark hover:bg-food-sage-light/60 hover:text-food-charcoal focus:ring-food-sage-light',
     sidebar: 'text-food-white hover:bg-food-white/10 hover:text-food-white focus:ring-food-sage',
-    danger: 'text-status-cancelled hover:bg-red-50 focus:ring-red-100',
+    danger: 'bg-status-cancelled text-food-white hover:bg-red-800 focus:ring-red-100',
   }
 
   return (
     <button
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-app-base font-semibold transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-app-base font-semibold transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
       type="button"
       {...props}
     >
@@ -19,7 +19,7 @@ export function Button({ children, className = '', variant = 'primary', ...props
 }
 
 export function Card({ children, className = '' }) {
-  return <section className={`rounded-2xl border border-food-sage-light bg-food-white p-6 shadow-sm sm:p-7 ${className}`}>{children}</section>
+  return <section className={`rounded-2xl border border-food-sage-light bg-food-white p-7 shadow-sm sm:p-8 ${className}`}>{children}</section>
 }
 
 export function PageHeader({ title, description, children }) {
@@ -85,7 +85,7 @@ export function FormField({ label, id, endAdornment, ...props }) {
       {label}
       <span className="relative mt-2 block">
         <input
-          className={`w-full rounded-xl border border-food-sage bg-food-white px-4 py-3.5 text-app-label text-food-charcoal outline-none transition focus:border-food-dark focus:ring-4 focus:ring-food-sage-light ${endAdornment ? 'pr-14' : ''}`}
+          className={`min-h-[52px] w-full rounded-xl border border-food-sage bg-food-white px-4 py-3.5 text-app-label text-food-charcoal outline-none transition focus:border-food-dark focus:ring-4 focus:ring-food-sage-light ${endAdornment ? 'pr-14' : ''}`}
           id={id}
           {...props}
         />

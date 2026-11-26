@@ -1,7 +1,8 @@
 class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, data) {
     super(message)
     this.status = status
+    this.data = data
   }
 }
 
@@ -14,7 +15,7 @@ async function request(path, options = {}) {
   const data = response.status === 204 || !isJson ? null : await response.json()
 
   if (!response.ok) {
-    throw new ApiError(data?.detail || 'No se pudo completar la solicitud.', response.status)
+    throw new ApiError(data?.detail || 'No se pudo completar la solicitud.', response.status, data)
   }
 
   return data
@@ -46,4 +47,4 @@ export async function logout() {
   })
 }
 
-export { ApiError }
+export { ApiError, request }

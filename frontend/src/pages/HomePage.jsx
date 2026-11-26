@@ -1,9 +1,11 @@
 import { ArrowRight, BookOpen, CalendarDays, ClipboardList, CreditCard, Soup } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import JornadaStatusBadge from '../components/JornadaStatusBadge.jsx'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../components/ui.jsx'
 import BrandName from '../components/BrandName.jsx'
 import { useAuth } from '../context/auth.js'
+import { useJornada } from '../context/jornada.js'
 
 const quickLinks = [
   { label: 'Jornadas', description: 'Organiza cada día de venta.', path: '/jornadas', icon: CalendarDays },
@@ -15,19 +17,27 @@ const quickLinks = [
 
 function HomePage() {
   const { user } = useAuth()
+  const { selectedJornada, isCheckingJornada } = useJornada()
 
   return (
     <div className="space-y-8">
       <PageHeader title={`Hola, ${user.username}`} description={<><BrandName /> te ayuda a organizar ventas familiares de comida de forma simple y ordenada.</>} />
 
       <Card className="border-food-sage bg-food-sage-light/55">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3"><h2 className="text-app-subtitle font-bold text-food-charcoal">Jornada de venta</h2><StatusBadge /></div>
-            <p className="mt-4 max-w-xl text-app-description leading-7 text-food-dark">La gestión de jornadas estará disponible en las próximas etapas. Aquí podrás iniciar y consultar la jornada activa.</p>
+        {isCheckingJornada ? <p className="text-app-body text-food-dark">Comprobando jornada seleccionada...</p> : selectedJornada ? (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-3"><h2 className="text-app-subtitle font-bold text-food-charcoal">{selectedJornada.nombre}</h2><JornadaStatusBadge estado={selectedJornada.estado} /><StatusBadge>Jornada activa</StatusBadge></div>
+              <p className="mt-4 text-app-description leading-7 text-food-dark">Fecha de venta: {new Intl.DateTimeFormat('es-BO', { dateStyle: 'long', timeZone: 'America/La_Paz' }).format(new Date(`${selectedJornada.fecha}T12:00:00Z`))}</p>
+            </div>
+            <Link className="inline-flex min-h-11 items-center justify-center rounded-xl bg-food-dark px-4 py-2.5 text-app-base font-semibold text-food-white hover:bg-food-charcoal focus:outline-none focus:ring-4 focus:ring-food-sage-light" to="/jornadas">Ver jornadas</Link>
           </div>
-          <CalendarDays className="size-9 text-food-dark" aria-hidden="true" />
-        </div>
+        ) : (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><h2 className="text-app-subtitle font-bold text-food-charcoal">Seleccione una jornada de trabajo</h2><p className="mt-4 max-w-xl text-app-description leading-7 text-food-dark">Cree o seleccione una jornada abierta para comenzar a gestionar las próximas operaciones.</p></div>
+            <Link className="inline-flex min-h-11 items-center justify-center rounded-xl bg-food-dark px-4 py-2.5 text-app-base font-semibold text-food-white hover:bg-food-charcoal focus:outline-none focus:ring-4 focus:ring-food-sage-light" to="/jornadas">Ir a jornadas</Link>
+          </div>
+        )}
       </Card>
 
       <section>
@@ -44,7 +54,7 @@ function HomePage() {
         </div>
       </section>
 
-      <EmptyState icon={ClipboardList} title="Módulos en preparación" description="Los datos de jornadas, menú, pedidos, pagos e historial aparecerán aquí cuando sus módulos estén disponibles." />
+      <EmptyState icon={ClipboardList} title="Próximos módulos" description="Menú, pedidos, pagos e historial se habilitarán en próximas etapas y utilizarán la jornada seleccionada." />
     </div>
   )
 }

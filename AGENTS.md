@@ -25,8 +25,9 @@
 ## Tipografía
 
 - El tamaño base de la interfaz es `16px`; no usar textos menores a `14px`.
-- Los tokens tipográficos se definen en `frontend/src/index.css` y se reutilizan mediante las utilidades de Tailwind: título principal `32px`, subtítulo `20px`, texto general y etiquetas `17px`, descripciones y botones `16px`, e indicadores de estado `14px`.
-- Las dimensiones deben priorizar legibilidad para usuarios adultos, con controles táctiles de al menos `44px` de alto y sin usar `zoom` ni `transform: scale()` para ampliar la interfaz.
+- Los tokens tipográficos se definen en `frontend/src/index.css` y se reutilizan mediante las utilidades de Tailwind: título principal `34px`, subtítulo `22px`, texto general `19px`, etiquetas, campos, botones y descripciones `18px`, e indicadores de estado `16px`.
+- La barra lateral de escritorio mide `310px`. Las dimensiones deben priorizar legibilidad para usuarios adultos, con botones de al menos `50px` y campos de al menos `52px` de alto, sin usar `zoom` ni `transform: scale()` para ampliar la interfaz.
+- Los formularios de fecha deben reutilizar `frontend/src/components/DatePicker.jsx`, conservar fechas en formato `YYYY-MM-DD` para la API y usar la zona horaria `America/La_Paz`.
 
 ## MVP
 

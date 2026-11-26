@@ -23,7 +23,7 @@ function Sidebar({ mobile = false, onClose }) {
   }
 
   return (
-    <aside className="flex h-full w-72 flex-col bg-food-dark px-5 py-6 text-food-white shadow-xl shadow-food-charcoal/25 lg:w-[280px] lg:border-r lg:border-food-dark lg:shadow-none">
+    <aside className="flex h-full w-80 flex-col bg-food-dark px-6 py-7 text-food-white shadow-xl shadow-food-charcoal/25 lg:w-[310px] lg:border-r lg:border-food-dark lg:shadow-none">
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-4">
           <span className="grid size-12 place-items-center rounded-xl bg-food-sage-light text-food-charcoal">
@@ -48,7 +48,7 @@ function Sidebar({ mobile = false, onClose }) {
             to={path}
             onClick={closeAfterNavigation}
           >
-            <Icon size={22} aria-hidden="true" />
+            <Icon size={24} aria-hidden="true" />
             {label}
           </NavLink>
         ))}

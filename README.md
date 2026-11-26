@@ -131,9 +131,34 @@ Rutas privadas disponibles:
 | `/pagos` | Gestión de pagos. |
 | `/historial` | Historial de ventas. |
 
-Las secciones de negocio muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios y no incluyen operaciones CRUD todavía.
+Las secciones de menú, pedidos, pagos e historial muestran estados provisionales claramente identificados. No presentan estadísticas ni datos ficticios.
 
 La API exige autenticación por defecto. Solo `/api/health/`, `/api/auth/csrf/` y `/api/auth/login/` permanecen públicos de forma explícita; las solicitudes que cambian estado conservan protección CSRF.
+
+## Jornadas de venta
+
+El módulo de jornadas permite crear y organizar eventos de venta independientes. Una jornada nueva siempre comienza abierta y se asigna automáticamente al usuario autenticado.
+
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/api/jornadas/` | Lista las jornadas por fecha descendente. |
+| `POST` | `/api/jornadas/` | Crea una jornada con nombre y fecha. |
+| `GET` | `/api/jornadas/{id}/` | Consulta una jornada. |
+| `PATCH` | `/api/jornadas/{id}/` | Edita nombre y fecha de una jornada abierta. |
+| `DELETE` | `/api/jornadas/{id}/` | Elimina la jornada y sus registros asociados. |
+| `POST` | `/api/jornadas/{id}/cerrar/` | Cierra una jornada. |
+| `POST` | `/api/jornadas/{id}/abrir/` | Reabre una jornada cerrada. |
+
+Reglas del módulo:
+
+- Todas las rutas requieren sesión autenticada y las operaciones de escritura requieren CSRF.
+- El nombre y la fecha son obligatorios; el nombre no admite solo espacios.
+- Se permiten fechas futuras y varias jornadas abiertas simultáneamente.
+- No se puede editar una jornada cerrada ni cambiar su estado mediante `PATCH`; debe reabrirse primero.
+- Una eliminación confirmada borra atómicamente los productos, pedidos, detalles y pagos asociados solo a esa jornada, sin afectar otras jornadas ni usuarios.
+- La interfaz permite seleccionar una jornada abierta. Solo su identificador se guarda localmente, asociado al usuario actual, y se valida contra la API al recargar o cerrar la sesión.
+
+Para usar el módulo, inicie sesión, abra **Jornadas**, cree una jornada con **Nueva jornada** y selecciónela mediante **Seleccionar**. La página de inicio mostrará la jornada activa. Antes de cerrar, reabrir o eliminar una jornada, la interfaz solicita confirmación mediante un diálogo accesible. La eliminación es permanente y también elimina los datos asociados a esa jornada.
 
 ## Verificaciones
 
@@ -148,4 +173,4 @@ npm run build
 
 ## Alcance actual
 
-El esquema de datos, la autenticación por sesiones y la interfaz principal navegable están implementados. Aún no incluye endpoints CRUD ni operaciones de jornadas, menú, pedidos, pagos o historial, dashboard estadístico, cálculo de totales ni transiciones de estado; esos módulos se implementarán en sus issues correspondientes.
+El esquema de datos, la autenticación por sesiones, la interfaz principal y la gestión de jornadas están implementados. Aún no incluye operaciones de menú, pedidos, pagos o historial, dashboard estadístico, cálculo de totales ni transiciones de estado de pedidos; esos módulos se implementarán en sus issues correspondientes.

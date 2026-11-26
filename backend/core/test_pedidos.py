@@ -74,13 +74,14 @@ class PedidosApiTests(TestCase):
         self.assertEqual(self.client.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).status_code, 403)
 
     def test_observaciones_opcionales_y_campos_protegidos(self):
-        data = self.data(); data.pop('observaciones')
+        data = self.data(observaciones='Sin cebolla'); data.pop('observaciones')
         created = self.post(reverse('pedido-list', args=[self.jornada.id]), data).json()
         pedido = Pedido.objects.get()
         self.assertEqual(pedido.observaciones, '')
+        pedido.observaciones = 'Sin cebolla'; pedido.save()
         update = self.data(nombre_cliente='Ana actualizada'); update.pop('observaciones')
         self.assertEqual(self.patch(reverse('pedido-detail', args=[created['id']]), update).status_code, 200)
-        pedido.refresh_from_db(); self.assertEqual(pedido.observaciones, '')
+        pedido.refresh_from_db(); self.assertEqual(pedido.observaciones, 'Sin cebolla')
         self.assertEqual(self.patch(reverse('pedido-detail', args=[pedido.id]), self.data(estado='entregado')).status_code, 400)
 
     def test_rechaza_cantidades_decimales_y_fuera_de_rango(self):
@@ -106,3 +107,14 @@ class PedidosApiTests(TestCase):
         response = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='Otra', detalles=[{'producto_id': self.plato.id, 'cantidad': 1}, {'producto_id': self.bebida.id, 'cantidad': 1}]))
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Pedido.objects.count(), 1)
+
+    def test_revierte_edicion_si_falla_despues_de_actualizar_detalle(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='Original', detalles=[{'producto_id': self.plato.id, 'cantidad': 1}])).json()
+        self.bebida.activo = False; self.bebida.save()
+
+        response = self.patch(reverse('pedido-detail', args=[created['id']]), self.data(nombre_cliente='Modificado', detalles=[{'producto_id': self.plato.id, 'cantidad': 4}, {'producto_id': self.bebida.id, 'cantidad': 1}]))
+
+        self.assertEqual(response.status_code, 400)
+        pedido = Pedido.objects.get(pk=created['id'])
+        self.assertEqual(pedido.nombre_cliente, 'Original')
+        self.assertEqual(list(pedido.detalles.values_list('producto_id', 'cantidad')), [(self.plato.id, 1)])

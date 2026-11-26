@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from .models import DetallePedido, Jornada, Pedido, Producto
+from .models import DetallePedido, Jornada, Pago, Pedido, Producto
 
 
 class PedidosApiTests(TestCase):
@@ -72,3 +72,37 @@ class PedidosApiTests(TestCase):
         self.assertEqual(self.client.get(reverse('pedido-detail', args=[created['id']])).status_code, 200)
         self.assertEqual(self.client.get(reverse('pedido-detail', args=[99999])).status_code, 404)
         self.assertEqual(self.client.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).status_code, 403)
+
+    def test_observaciones_opcionales_y_campos_protegidos(self):
+        data = self.data(); data.pop('observaciones')
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), data).json()
+        pedido = Pedido.objects.get()
+        self.assertEqual(pedido.observaciones, '')
+        update = self.data(nombre_cliente='Ana actualizada'); update.pop('observaciones')
+        self.assertEqual(self.patch(reverse('pedido-detail', args=[created['id']]), update).status_code, 200)
+        pedido.refresh_from_db(); self.assertEqual(pedido.observaciones, '')
+        self.assertEqual(self.patch(reverse('pedido-detail', args=[pedido.id]), self.data(estado='entregado')).status_code, 400)
+
+    def test_rechaza_cantidades_decimales_y_fuera_de_rango(self):
+        for cantidad in (-1, 1.5, 2147483648):
+            response = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': cantidad}]))
+            self.assertEqual(response.status_code, 400)
+
+    def test_precios_historicos_productos_desactivados_y_pagos(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 1}])).json()
+        pedido = Pedido.objects.get(); self.plato.activo = False; self.plato.precio = Decimal('50.00'); self.plato.save()
+        self.assertEqual(self.patch(reverse('pedido-detail', args=[pedido.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 2}])).status_code, 200)
+        self.assertEqual(DetallePedido.objects.get().precio_unitario, Decimal('20.00'))
+        Pago.objects.create(pedido=pedido, monto=Decimal('1.00'), metodo='efectivo', registrado_por=self.user)
+        response = self.patch(reverse('pedido-detail', args=[pedido.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 3}]))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Pago.objects.filter(pedido=pedido).count(), 1)
+
+    def test_ignora_precios_manipulados_y_revierte_creacion_intermedia(self):
+        response = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 1, 'precio_unitario': '0.01'}]))
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(DetallePedido.objects.get().precio_unitario, Decimal('20.00'))
+        self.bebida.activo = False; self.bebida.save()
+        response = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='Otra', detalles=[{'producto_id': self.plato.id, 'cantidad': 1}, {'producto_id': self.bebida.id, 'cantidad': 1}]))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Pedido.objects.count(), 1)

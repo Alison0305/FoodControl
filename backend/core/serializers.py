@@ -88,7 +88,7 @@ class DetallePedidoSerializer(serializers.ModelSerializer):
 
 class DetallePedidoInputSerializer(serializers.Serializer):
     producto_id = serializers.IntegerField(min_value=1)
-    cantidad = serializers.IntegerField(min_value=1)
+    cantidad = serializers.IntegerField(min_value=1, max_value=2147483647)
 
 
 class PedidoSerializer(serializers.ModelSerializer):

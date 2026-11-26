@@ -38,7 +38,13 @@ def guardar_pedido(*, jornada, usuario, datos, pedido=None):
         raise ValidationError({'detalles': 'Todos los productos deben pertenecer a la jornada seleccionada.'})
 
     if pedido is None:
-        pedido = Pedido.objects.create(jornada=jornada, registrado_por=usuario, **{key: datos[key] for key in ('nombre_cliente', 'tipo', 'observaciones')})
+        pedido = Pedido.objects.create(
+            jornada=jornada,
+            registrado_por=usuario,
+            nombre_cliente=datos['nombre_cliente'],
+            tipo=datos['tipo'],
+            observaciones=datos.get('observaciones', ''),
+        )
         detalles_existentes = {}
     else:
         detalles_existentes = {detalle.producto_id: detalle for detalle in pedido.detalles.select_related('producto')}
@@ -48,7 +54,7 @@ def guardar_pedido(*, jornada, usuario, datos, pedido=None):
             raise ValidationError({'detalles': 'No se pueden modificar productos ni cantidades de un pedido con pagos registrados.'})
         pedido.nombre_cliente = datos['nombre_cliente']
         pedido.tipo = datos['tipo']
-        pedido.observaciones = datos['observaciones']
+        pedido.observaciones = datos.get('observaciones', pedido.observaciones)
         pedido.save(update_fields=['nombre_cliente', 'tipo', 'observaciones'])
 
     for detail in datos['detalles']:
@@ -56,7 +62,10 @@ def guardar_pedido(*, jornada, usuario, datos, pedido=None):
         existente = detalles_existentes.pop(producto.id, None)
         if existente:
             existente.cantidad = detail['cantidad']
-            existente.full_clean()
+            try:
+                existente.full_clean()
+            except DjangoValidationError as error:
+                raise ValidationError(error.message_dict) from error
             existente.save(update_fields=['cantidad'])
             continue
         if not producto.activo:

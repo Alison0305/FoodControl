@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from .models import Jornada, Pedido, Producto
 from .serializers import JornadaSerializer, PedidoSerializer, PedidoWriteSerializer, ProductoSerializer
-from .services import eliminar_jornada, filtrar_pedidos, guardar_pedido
+from .services import cambiar_estado_pedido, eliminar_jornada, filtrar_pedidos, guardar_pedido
 from .validators import validar_jornada_abierta
 
 @api_view(['GET'])
@@ -249,5 +249,18 @@ def pedido_detail(request, pedido_id):
     serializer = PedidoWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     pedido = guardar_pedido(jornada=pedido.jornada, usuario=request.user, datos=serializer.validated_data, pedido=pedido)
+    pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto', 'pagos').get(pk=pedido.pk)
+    return Response(PedidoSerializer(pedido).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def cambiar_estado_pedido_view(request, pedido_id):
+    pedido = get_object_or_404(Pedido.objects.select_related('jornada', 'registrado_por').prefetch_related('detalles__producto', 'pagos'), pk=pedido_id)
+    estado = request.data.get('estado')
+    if estado not in Pedido.Estado.values:
+        return Response({'estado': 'El estado solicitado no es válido.'}, status=400)
+    pedido = cambiar_estado_pedido(pedido, estado)
     pedido = Pedido.objects.select_related('registrado_por').prefetch_related('detalles__producto', 'pagos').get(pk=pedido.pk)
     return Response(PedidoSerializer(pedido).data)

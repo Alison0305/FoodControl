@@ -208,6 +208,7 @@ Reglas del módulo:
 - El listado de pedidos admite `busqueda`, `tipo`, `estado`, `estado_pago` y `orden`. La búsqueda ignora tildes y mayúsculas; acepta nombres o el identificador exacto, por ejemplo `Castro`, `Jose` o `#3`.
 - Los estados de pago son `pendiente`, `parcial` y `pagado`, calculados con el total histórico y los pagos asociados. Los pedidos gratuitos se consideran pagados.
 - Las opciones de orden son `recientes`, `antiguos`, `cliente_az`, `cliente_za`, `importe_mayor` e `importe_menor`.
+- `POST /api/pedidos/{id}/estado/` cambia el estado mediante las transiciones `en_espera` a `en_preparacion` o `cancelado`, y `en_preparacion` a `entregado` o `cancelado`. La entrega registra su fecha; la cancelación se bloquea cuando hay pagos.
 
 ## Verificaciones
 

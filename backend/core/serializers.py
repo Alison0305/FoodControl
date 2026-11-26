@@ -115,7 +115,7 @@ class PedidoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Pedido
-        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'estado_pago', 'observaciones', 'registrado_por', 'fecha_creacion', 'detalles', 'total', 'cantidad_total')
+        fields = ('id', 'jornada', 'nombre_cliente', 'tipo', 'estado', 'estado_pago', 'observaciones', 'registrado_por', 'fecha_creacion', 'fecha_entrega', 'detalles', 'total', 'cantidad_total')
         read_only_fields = ('id', 'jornada', 'estado', 'registrado_por', 'fecha_creacion', 'detalles')
 
 

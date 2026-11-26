@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "test:money": "node --test src/utils/money.test.js src/utils/orderFilters.test.js",
+    "test:money": "node --test src/utils/money.test.js src/utils/orderFilters.test.js src/utils/orderStatus.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

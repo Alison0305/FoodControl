@@ -16,6 +16,7 @@ from .views import (
     desactivar_producto,
     pedido_detail,
     pedidos_jornada,
+    cambiar_estado_pedido_view,
 )
 
 urlpatterns = [
@@ -34,4 +35,5 @@ urlpatterns = [
     path('productos/<int:producto_id>/desactivar/', desactivar_producto, name='producto-desactivar'),
     path('jornadas/<int:jornada_id>/pedidos/', pedidos_jornada, name='pedido-list'),
     path('pedidos/<int:pedido_id>/', pedido_detail, name='pedido-detail'),
+    path('pedidos/<int:pedido_id>/estado/', cambiar_estado_pedido_view, name='pedido-estado'),
 ]

@@ -3,6 +3,7 @@ import unicodedata
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from .models import DetallePedido, Pago, Pedido, Producto
@@ -51,6 +52,30 @@ def filtrar_pedidos(pedidos, *, busqueda='', tipo='', estado='', estado_pago='',
     if orden in ('importe_mayor', 'importe_menor'):
         return sorted(filtered, key=lambda pedido: (importes_pedido(pedido.detalles.all())[0], pedido.fecha_creacion, pedido.id), reverse=orden == 'importe_mayor')
     return sorted(filtered, key=lambda pedido: (pedido.fecha_creacion, pedido.id), reverse=True)
+
+
+@transaction.atomic
+def cambiar_estado_pedido(pedido, nuevo_estado):
+    try:
+        validar_jornada_abierta(pedido.jornada)
+    except DjangoValidationError as error:
+        raise ValidationError({'detail': error.messages[0]}) from error
+    transitions = {
+        Pedido.Estado.EN_ESPERA: {Pedido.Estado.EN_PREPARACION, Pedido.Estado.CANCELADO},
+        Pedido.Estado.EN_PREPARACION: {Pedido.Estado.ENTREGADO, Pedido.Estado.CANCELADO},
+    }
+    if nuevo_estado not in transitions.get(pedido.estado, set()):
+        raise ValidationError({'estado': 'La transición de estado solicitada no está permitida.'})
+    if nuevo_estado == Pedido.Estado.CANCELADO and pedido.pagos.exists():
+        raise ValidationError({'detail': 'No se puede cancelar un pedido con pagos registrados sin resolver.'})
+    updates = {'estado': nuevo_estado}
+    if nuevo_estado == Pedido.Estado.ENTREGADO:
+        updates['fecha_entrega'] = timezone.now()
+    updated = Pedido.objects.filter(pk=pedido.pk, estado=pedido.estado).update(**updates)
+    if not updated:
+        raise ValidationError({'estado': 'El pedido fue actualizado por otra operación. Intente nuevamente.'})
+    pedido.refresh_from_db()
+    return pedido
 
 
 @transaction.atomic

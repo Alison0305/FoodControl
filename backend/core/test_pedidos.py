@@ -118,3 +118,14 @@ class PedidosApiTests(TestCase):
         pedido = Pedido.objects.get(pk=created['id'])
         self.assertEqual(pedido.nombre_cliente, 'Original')
         self.assertEqual(list(pedido.detalles.values_list('producto_id', 'cantidad')), [(self.plato.id, 1)])
+
+    def test_calcula_subtotales_total_y_cantidad_con_precision_decimal(self):
+        self.plato.precio = Decimal('25.00'); self.plato.save()
+        response = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(detalles=[{'producto_id': self.plato.id, 'cantidad': 3}, {'producto_id': self.bebida.id, 'cantidad': 2}]))
+        data = response.json()
+        self.assertEqual(data['total'], '85.00')
+        self.assertEqual(data['cantidad_total'], 5)
+        self.assertEqual([detail['subtotal'] for detail in data['detalles']], ['75.00', '10.00'])
+        self.plato.precio = Decimal('30.00'); self.plato.save()
+        detail = self.client.get(reverse('pedido-detail', args=[data['id']])).json()
+        self.assertEqual(detail['total'], '85.00')

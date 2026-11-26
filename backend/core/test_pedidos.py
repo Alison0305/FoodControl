@@ -161,3 +161,46 @@ class PedidosApiTests(TestCase):
         other = Jornada.objects.create(nombre='Otra', fecha=date(2026, 8, 1), creado_por=self.user)
         self.assertEqual(self.client.get(f'{reverse("pedido-list", args=[self.jornada.id])}?estado_pago=pagado').json()[0]['id'], free['id'])
         self.assertEqual(self.client.get(reverse('pedido-list', args=[other.id])).json(), [])
+
+    def test_transiciones_operativas_y_fecha_entrega(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).json()
+        url = reverse('pedido-estado', args=[created['id']])
+        preparing = self.post(url, {'estado': Pedido.Estado.EN_PREPARACION})
+        delivered = self.post(url, {'estado': Pedido.Estado.ENTREGADO})
+        self.assertEqual(preparing.status_code, 200)
+        self.assertEqual(delivered.status_code, 200)
+        self.assertIsNotNone(delivered.json()['fecha_entrega'])
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.ENTREGADO}).status_code, 400)
+
+    def test_cancelacion_bloqueada_por_pagos_y_transiciones_invalidas(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).json()
+        pedido = Pedido.objects.get(pk=created['id'])
+        url = reverse('pedido-estado', args=[pedido.id])
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.ENTREGADO}).status_code, 400)
+        Pago.objects.create(pedido=pedido, monto=Decimal('1.00'), metodo='efectivo', registrado_por=self.user)
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.CANCELADO}).status_code, 400)
+        self.assertTrue(Pedido.objects.filter(pk=pedido.id, estado=Pedido.Estado.EN_ESPERA).exists())
+
+    def test_cancelacion_desde_espera_conserva_datos_e_importes(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(observaciones='Sin ají')).json()
+        response = self.post(reverse('pedido-estado', args=[created['id']]), {'estado': Pedido.Estado.CANCELADO})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['estado'], Pedido.Estado.CANCELADO)
+        self.assertEqual(response.json()['total'], created['total'])
+        self.assertEqual(response.json()['observaciones'], 'Sin ají')
+
+    def test_cancelacion_desde_preparacion_y_jornada_cerrada(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).json()
+        url = reverse('pedido-estado', args=[created['id']])
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 200)
+        self.assertEqual(self.post(url, {'estado': Pedido.Estado.CANCELADO}).status_code, 200)
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data(nombre_cliente='Otra')).json()
+        self.jornada.estado = Jornada.Estado.CERRADA; self.jornada.save()
+        self.assertEqual(self.post(reverse('pedido-estado', args=[created['id']]), {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 400)
+
+    def test_endpoint_estado_exige_csrf_y_autenticacion(self):
+        created = self.post(reverse('pedido-list', args=[self.jornada.id]), self.data()).json()
+        url = reverse('pedido-estado', args=[created['id']])
+        self.assertEqual(self.client.post(url, {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 403)
+        anonymous = Client(enforce_csrf_checks=True)
+        self.assertEqual(anonymous.post(url, {'estado': Pedido.Estado.EN_PREPARACION}).status_code, 403)

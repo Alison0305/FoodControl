@@ -9,3 +9,4 @@ export const listPedidos = (jornadaId) => request(`/api/jornadas/${jornadaId}/pe
 export const getPedido = (pedidoId) => request(`/api/pedidos/${pedidoId}/`)
 export const createPedido = (jornadaId, data) => write(`/api/jornadas/${jornadaId}/pedidos/`, 'POST', data)
 export const updatePedido = (pedidoId, data) => write(`/api/pedidos/${pedidoId}/`, 'PATCH', data)
+export const updatePedidoEstado = (pedidoId, estado) => write(`/api/pedidos/${pedidoId}/estado/`, 'POST', { estado })
